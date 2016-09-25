@@ -28,11 +28,11 @@ void ColumnBase::setName(string nameValue) {
 }
 
 //get column type
-DB_Type ColumnBase::getType() {
+ColumnBase::COLUMN_TYPE ColumnBase::getType() {
 	return type;
 }
 //set column type
-void ColumnBase::setType(DB_Type typeValue) {
+void ColumnBase::setType(ColumnBase::COLUMN_TYPE typeValue) {
 	type = typeValue;
 }
 

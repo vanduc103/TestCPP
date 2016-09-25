@@ -1,6 +1,6 @@
 CXXFLAGS =	-O2 -g -Wall -fmessage-length=0
 
-OBJS =		TestCpp.o
+OBJS =		TestCpp.o Dictionary.o Column.o ColumnBase.o
 
 LIBS =
 

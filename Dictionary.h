@@ -4,12 +4,13 @@
  *  Created on: Sep 23, 2016
  *      Author: duclv
  */
-#import <vector>
-
 #ifndef DICTIONARY_H_
 #define DICTIONARY_H_
 
-namespace std {
+#include <vector>
+#include <algorithm>
+
+using namespace std;
 
 template<class T>
 class Dictionary {
@@ -19,10 +20,11 @@ public:
 	Dictionary();
 	virtual ~Dictionary();
 
-	T lookup(int index);
-	int search(T value);
+	T* lookup(int index);
+	typename vector<T>::iterator search(T& value);
+	int addNewElement(T& value, vector<int>& vecValue);
+	void print(int row);
 };
 
-} /* namespace std */
 
 #endif /* DICTIONARY_H_ */

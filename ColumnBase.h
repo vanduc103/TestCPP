@@ -4,18 +4,20 @@
  *  Created on: Sep 23, 2016
  *      Author: duclv
  */
-#include <string>
+
 #ifndef COLUMNBASE_H_
 #define COLUMNBASE_H_
 
+#include <string>
+
 namespace std {
 
-enum DB_Type {intType, charType, varcharType};
-
 class ColumnBase {
+public:
+	enum COLUMN_TYPE {intType, charType, varcharType};
 private:
 	string name;
-	DB_Type type;
+	COLUMN_TYPE type;
 	int size;
 public:
 	ColumnBase();
@@ -24,8 +26,8 @@ public:
 	string getName();
 	void setName(string nameValue);
 
-	DB_Type getType();
-	void setType(DB_Type typeValue);
+	COLUMN_TYPE getType();
+	void setType(COLUMN_TYPE typeValue);
 
 	int getSize();
 	void setSize(int sizeValue);
