@@ -13,6 +13,7 @@
 #include <fstream>
 #include <chrono>
 #include <ctime>
+#include <tuple>
 
 #include "Dictionary.h"
 #include "Column.h"
@@ -45,8 +46,6 @@ int main(void) {
 	cout << "lookup " << index << ", got " << *a << "\n";
 	cout << "vecValue[" << index << "] = " << colValue[index] << ", size =" << colValue.size() << "\n";*/
 
-	// Table
-	Table<int, string, int, string>* table = new Table<int, string, int, string>();
 
 	// Column 1
 	Column<string> * col1 = new Column<string>();
@@ -64,6 +63,10 @@ int main(void) {
 	Dictionary<int>* colDict2 = col2->getDictionary();
 	vector<size_t> * colValue2 = col2->getVecValue();
 
+	// Table
+	Table<Column<string>, Column<int>>* table = new Table<Column<string>, Column<int>>();
+	table->setName("orders");
+
 	//get the starting value of clock
 	//clock_t start = clock();
 	// display current time
@@ -71,8 +74,8 @@ int main(void) {
 	cout << "Now is " << ctime(&t) << endl;
 
 	// read file
-	//ifstream infile("/home/duclv/Downloads/data.csv");
-	ifstream infile("/home/duclv/homework/data1M.csv");
+	ifstream infile("/home/duclv/Downloads/data.csv");
+	//ifstream infile("/home/duclv/homework/data1M.csv");
 	string line;
 	string delim = ",";
 	size_t pos = 0;
@@ -97,6 +100,10 @@ int main(void) {
 		cout << "Row: " << ++row << endl;
 	}
 	infile.close();
+	// tuple of columns
+	auto colList = make_tuple(&col1, &col2);
+	table->setColumnList(colList);
+
 	// print result
 	colDict2->print(100);
 	col2->printVecValue(100);
