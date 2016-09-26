@@ -14,21 +14,21 @@
 
 namespace std {
 
-template<typename T1, typename T2>
+template<typename T>
 class Column : public ColumnBase {
 private:
 	//value vector for column
-	vector<T1> vecValue;
+	vector<size_t> * vecValue;
 	//dictionary vector for column
-	Dictionary<T2>* dictionary;
+	Dictionary<T> * dictionary;
 public:
 	Column();
 	virtual ~Column();
 
-	vector<T1> getVecValue();
+	vector<size_t> * getVecValue();
 	void printVecValue(int row);
 
-	Dictionary<T2>* getDictionary();
+	Dictionary<T> * getDictionary();
 };
 
 } /* namespace std */

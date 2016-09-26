@@ -7,6 +7,7 @@
 #ifndef DICTIONARY_H_
 #define DICTIONARY_H_
 
+#include "ColumnBase.h"
 #include <vector>
 #include <algorithm>
 
@@ -20,9 +21,9 @@ public:
 	Dictionary();
 	virtual ~Dictionary();
 
-	T* lookup(int index);
-	typename vector<T>::iterator search(T& value);
-	int addNewElement(T& value, vector<int>& vecValue);
+	T* lookup(size_t index);
+	void search(T& value, ColumnBase::OP_TYPE opType, vector<size_t>& result);
+	int addNewElement(T& value, vector<size_t>& vecValue);
 	void print(int row);
 };
 

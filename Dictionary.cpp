@@ -17,28 +17,14 @@ using namespace std;
 
 template<class T>
 Dictionary<T>::Dictionary() {
-	vector<T> items;
 }
 
 template<class T>
-T* Dictionary<T>::lookup(int index) {
+T* Dictionary<T>::lookup(size_t index) {
 	if (items.empty() || index < 0 || index >= items.size()) {
 		return (T*) 0;
 	} else {
 		return &items.at(index);
-	}
-}
-
-template<class T>
-typename vector<T>::iterator Dictionary<T>::search(T& value) {
-	if (items.empty()) {
-		return items.end();	// first position in vector
-	} else {
-		// find the lower bound for value in vector
-		typename vector<T>::iterator lower;
-		lower = std::lower_bound(items.begin(), items.end(), value);
-		//printf("compFunc(%d, %d) is %d \n", value, *lower, compFunc(value, *lower));
-		return lower;
 	}
 }
 
@@ -54,7 +40,100 @@ bool equalFunc(T value1, T value2) {
 }
 
 template<class T>
-int Dictionary<T>::addNewElement(T& value, vector<int>& vecValue) {
+void Dictionary<T>::search(T& value, ColumnBase::OP_TYPE opType, vector<size_t>& result) {
+	if (items.empty()) {
+		// return -1 to show no result
+		result.push_back(-1);
+	} else {
+		// find the lower bound for value in vector
+		typename vector<T>::iterator lower;
+		lower = std::lower_bound(items.begin(), items.end(), value,
+				compFunc<T>);
+
+		// based on operator to find exact position in dictionary
+		switch (opType) {
+		case ColumnBase::equalOp: {
+			if (lower != items.end() && equalFunc(*lower, value)) {
+				result.push_back(lower - items.begin());
+			} else {
+				// return -1 to show no result
+				result.push_back(-1);
+			}
+			break;
+		}
+		case ColumnBase::neOp: {
+			int exclusivePosition = -1;
+			if (lower != items.end() && equalFunc(*lower, value)) {
+				exclusivePosition = lower - items.begin();
+			}
+			// return all dictionary positions except exclusiveValue
+			for (size_t i = 0; i < items.size(); i++) {
+				if (i != exclusivePosition) {
+					result.push_back(i);
+				}
+			}
+			break;
+		}
+		case ColumnBase::ltOp: {
+			// return positions from 0 to lower
+			for (size_t i = 0;
+					(lower == items.end()) ?
+							i < items.size() : i < (lower - items.begin());
+					i++) {
+				result.push_back(i);
+			}
+			break;
+		}
+		case ColumnBase::leOp: {
+			unsigned int position = -1;
+			if (lower == items.end()) {
+				position = items.size();
+			} else if (equalFunc(*lower, value)) {
+				position = (lower - items.begin()) + 1;
+			} else {
+				position = lower - items.begin();
+			}
+			// return from 0 to position
+			for (size_t i = 0; i < position; i++) {
+				result.push_back(i);
+			}
+			break;
+		}
+		case ColumnBase::gtOp: {
+			unsigned int position = items.size();
+			if (lower == items.end()) {
+				// all items are less than value
+				position = items.size();
+			} else if (equalFunc(*lower, value)) {
+				position = (lower - items.begin()) + 1;
+			} else {
+				position = lower - items.begin();
+			}
+			// return from postion to items.size()
+			for (size_t i = position; i < items.size(); i++) {
+				result.push_back(i);
+			}
+			break;
+		}
+		case ColumnBase::geOp: {
+			// return from lower to items.size()
+			unsigned int i =
+					(lower == items.end()) ?
+							items.size() : (lower - items.begin());
+			for (; i < items.size(); i++) {
+				result.push_back(i);
+			}
+			break;
+		}
+		case ColumnBase::likeOp: {
+			break;
+		}
+		}
+	}
+}
+
+template<class T>
+int Dictionary<T>::addNewElement(T& value, vector<size_t>& vecValue) {
 	if (items.empty()) {
 		items.push_back(value);
 		vecValue.push_back(0);
@@ -62,7 +141,8 @@ int Dictionary<T>::addNewElement(T& value, vector<int>& vecValue) {
 	} else {
 		// find the lower bound for value in vector
 		typename vector<T>::iterator lower;
-		lower = std::lower_bound(items.begin(), items.end(), value, compFunc<T>);
+		lower = std::lower_bound(items.begin(), items.end(), value,
+				compFunc<T>);
 		//cout << "compFunc(" << value <<", " << *lower <<") is "<< compFunc(value, *lower) <<"\n";
 		// value existed
 		if (lower != items.end() && equalFunc(value, *lower)) {
@@ -70,8 +150,7 @@ int Dictionary<T>::addNewElement(T& value, vector<int>& vecValue) {
 			long elementPos = lower - items.begin();
 			vecValue.push_back(elementPos);
 			return elementPos;
-		}
-		else {
+		} else {
 			// The position of new element in dictionary
 			long newElementPos = 0L;
 			if (lower == items.end()) {
@@ -79,8 +158,7 @@ int Dictionary<T>::addNewElement(T& value, vector<int>& vecValue) {
 				newElementPos = items.size();
 				items.push_back(value);
 				vecValue.push_back(newElementPos);
-			}
-			else {
+			} else {
 				newElementPos = lower - items.begin();
 				// insert into dictionary
 				items.insert(lower, value);
@@ -111,6 +189,7 @@ Dictionary<T>::~Dictionary() {
 	delete &items;
 }
 
-template class Dictionary<string>;
+template class Dictionary<string> ;
+template class Dictionary<int> ;
 
 #endif

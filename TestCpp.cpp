@@ -11,10 +11,13 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <chrono>
+#include <ctime>
 
 #include "Dictionary.h"
 #include "Column.h"
 #include "ColumnBase.h"
+#include "Table.h"
 
 using namespace std;
 class TestCPP {
@@ -42,22 +45,40 @@ int main(void) {
 	cout << "lookup " << index << ", got " << *a << "\n";
 	cout << "vecValue[" << index << "] = " << colValue[index] << ", size =" << colValue.size() << "\n";*/
 
-	// Column
-	Column<int, string> * col1 = new Column<int, string>();
+	// Table
+	Table<int, string, int, string>* table = new Table<int, string, int, string>();
+
+	// Column 1
+	Column<string> * col1 = new Column<string>();
 	col1->setName("o_orderstatus");
 	col1->setType(ColumnBase::charType);
 	col1->setSize(1);
 	Dictionary<string>* colDict1 = col1->getDictionary();
-	vector<int> colValue1 = col1->getVecValue();
+	vector<size_t> * colValue1 = col1->getVecValue();
+
+	// Column 2
+	Column<int> * col2 = new Column<int>();
+	col2->setName("o_totalprice");
+	col2->setType(ColumnBase::intType);
+	col2->setSize(4);
+	Dictionary<int>* colDict2 = col2->getDictionary();
+	vector<size_t> * colValue2 = col2->getVecValue();
+
+	//get the starting value of clock
+	//clock_t start = clock();
+	// display current time
+	time_t t = time(NULL);
+	cout << "Now is " << ctime(&t) << endl;
 
 	// read file
-	ifstream infile("/home/duclv/Downloads/data.csv");
+	//ifstream infile("/home/duclv/Downloads/data.csv");
+	ifstream infile("/home/duclv/homework/data1M.csv");
 	string line;
 	string delim = ",";
-	int pos = 0;
+	size_t pos = 0;
+	int row = 0;
 	while(getline(infile, line)) {
-		// extract status column
-		int i = 0;
+		char i = 0;
 		while ((pos = line.find(delim)) != string::npos) {
 		    string token = line.substr(0, pos);
 		    //std::cout << token << std::endl;
@@ -65,16 +86,68 @@ int main(void) {
 		    i++;
 		    // status is 2nd column
 		    if (i == 2) {
-		    	colDict1->addNewElement(token, colValue1);
+		    	colDict1->addNewElement(token, *colValue1);
+		    }
+		    // totalprice is 3rd column
+		    if (i == 3) {
+		    	int totalprice = stoi(token);
+		    	colDict2->addNewElement(totalprice, *colValue2);
 		    }
 		}
+		cout << "Row: " << ++row << endl;
 	}
 	infile.close();
 	// print result
-	colDict1->print(100);
-	for (int i = 0; i < colValue1.size() && i < 100; i++) {
-		cout << "vecValue[" << i << "] = " << colValue1[i] << "\n";
+	colDict2->print(100);
+	col2->printVecValue(100);
+
+	// display current time
+	t = time(NULL);
+	cout << "Now is " << ctime(&t) << endl;
+
+	// search on totalprice
+	int searchTotalprice = 56789;
+	cout << "Select totalprice > " << searchTotalprice << endl;
+	vector<size_t> result;
+	colDict2->search(searchTotalprice, ColumnBase::gtOp, result);
+	// print result
+	for (size_t i = 0; i < result.size() && i < 100; i++) {
+		size_t encode = result[i];
+		int * a = colDict2->lookup(encode);
+		for (size_t j = 0; j < (*colValue2).size(); j++) {
+			if (encode == (*colValue2)[j]) {
+				cout << "Result[" << j << "] = " << *a << endl;
+			}
+		}
 	}
+
+	// search 2
+	int totalprice1 = 5678;
+	int totalprice2 = 56789;
+	cout << "Select " << totalprice1 << " < totalprice < " << totalprice2 << endl;
+	vector<size_t> result1;
+	colDict2->search(totalprice1, ColumnBase::gtOp, result1);
+	vector<size_t> result2;
+	colDict2->search(totalprice2, ColumnBase::ltOp, result2);
+	vector<size_t> resultJoin;
+	// join from min value of result1 to max value of result2
+	for (size_t i = result1.front(); i < result2.back(); i++) {
+		resultJoin.push_back(i);
+	}
+	// print result
+	for (size_t i = 0; i < resultJoin.size() && i < 100; i++) {
+		size_t encode = resultJoin[i];
+		int * a = colDict2->lookup(encode);
+		for (size_t j = 0; j < (*colValue2).size(); j++) {
+			if (encode == (*colValue2)[j]) {
+				cout << "Result[" << j << "] = " << *a << endl;
+			}
+		}
+	}
+
+	// display current time
+	t = time(NULL);
+	cout << "Now is " << ctime(&t) << endl;
 
 	return EXIT_SUCCESS;
 }
