@@ -134,7 +134,7 @@ void Dictionary<T>::search(T& value, ColumnBase::OP_TYPE opType, vector<size_t>&
 }
 
 template<class T>
-int Dictionary<T>::addNewElement(T& value, vector<size_t>& vecValue) {
+size_t Dictionary<T>::addNewElement(T& value, vector<size_t>& vecValue) {
 	if (items->empty()) {
 		items->push_back(value);
 		vecValue.push_back(0);
@@ -153,7 +153,7 @@ int Dictionary<T>::addNewElement(T& value, vector<size_t>& vecValue) {
 			return elementPos;
 		} else {
 			// The position of new element in dictionary
-			long newElementPos = 0L;
+			size_t newElementPos = 0L;
 			if (lower == items->end()) {
 				// insert to the end of dictionary
 				newElementPos = items->size();
@@ -176,6 +176,11 @@ int Dictionary<T>::addNewElement(T& value, vector<size_t>& vecValue) {
 			return newElementPos;
 		}
 	}
+}
+
+template<class T>
+size_t Dictionary<T>::size() {
+	return items->size();
 }
 
 template<class T>

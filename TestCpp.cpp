@@ -62,8 +62,12 @@ int main(void) {
 	cout << "Now is " << ctime(&t) << endl;
 
 	// read file
-	//ifstream infile("/home/duclv/Downloads/data.csv");
-	ifstream infile("/home/duclv/homework/data1M.csv");
+	//cout << "Enter file path: ";
+	string filePath;
+	//cin >> filePath;
+	//ifstream infile(filePath);
+	ifstream infile("/home/duclv/Downloads/data1M.csv");
+	//ifstream infile("/home/duclv/homework/data1M.csv");
 	string line;
 	string delim = ",";
 	size_t pos = 0;
@@ -72,7 +76,7 @@ int main(void) {
 		char i = 0;
 		while ((pos = line.find(delim)) != string::npos) {
 		    string token = line.substr(0, pos);
-		    std::cout << token << std::endl;
+		    //std::cout << token << std::endl;
 		    line.erase(0, pos + delim.length());
 		    i++;
 		    // status is 2nd column
@@ -94,49 +98,117 @@ int main(void) {
 		//cout << "Row: " << ++row << endl;
 	}
 	infile.close();
+	// update encoded velue vector
+	cout << col1->getName() << " number of distinct values = " << colDict1->size() << endl;
+	cout << col2->getName() << " number of distinct values = " << colDict2->size() << endl;
+	cout << col3->getName() << " number of distinct values = " << colDict3->size() << endl;
+	col1->updateEncodedVecValue(colValue1, colDict1->size());
+	col2->updateEncodedVecValue(colValue2, colDict2->size());
+	col3->updateEncodedVecValue(colValue3, colDict3->size());
+	//col3->printEncodedVecValue(100);
+
 	// init Table
-	Table<string, int> table (col1, col2);
+	Table<string, int, string> table (col1, col2, col3);
 	table.setName("orders");
 
 	// print result
 	//colDict2->print(100);
-	//col2->printVecValue(100);
-	colDict3->print(100);
+	//col3->printVecValue(100);
+	//colDict3->print(100);
 
 	// display current time
 	t = time(NULL);
 	cout << "Now is " << ctime(&t) << endl;
 
-	// parse a given query
-	string query = "Select * from orders where o_totalprice < 56789 and o_totalprice > 5678";
-	hsql::SQLParserResult* pResult = hsql::SQLParser::parseSQLString(query);
+	// query
+	while (true) {
+		string query = "Select * from orders where o_totalprice < 56789 and o_totalprice > 5678";
+		cout << "Enter a query: ";
+		getline(cin, query);
+		if ("quit" == query)
+			break;
 
-	// check whether the parsing was successful
-	if (pResult->isValid) {
-		printf("Parsed successfully!\n");
-		// process the statements...
-		hsql::SQLStatement* stmt = pResult->getStatement(0);
-		if (stmt->type() == hsql::StatementType::kStmtSelect) {
-			hsql::SelectStatement* select = (hsql::SelectStatement*) stmt;
-			string tableName = select->fromTable->getName();
-			cout << "Table name: " << tableName << endl;
-			if (select->whereClause != NULL) {
-				hsql::Expr* expr = select->whereClause;
-				hsql::Expr* expr1 = expr->expr;
-				hsql::Expr* expr2 = expr->expr2;
-				hsql::Expr::OperatorType opType = expr->op_type;
-				cout << "where " << expr1->expr->name
-						<< " " << expr1->op_char
-						<< " " << expr1->expr2->ival
-						<< ((opType == hsql::Expr::OperatorType::AND) ? " AND " : " ")
-						<< expr2->expr->name
-						<< " " << expr2->op_char
-						<< " " << expr2->expr2->ival << endl;
+		// parse a given query
+		hsql::SQLParserResult* pResult = hsql::SQLParser::parseSQLString(query);
+		// check whether the parsing was successfull
+		bool queryValid = pResult->isValid;
+		if (queryValid) {
+			printf("Parsed successfully!\n");
+			// process the statements...
+			string q_table;
+			vector<string> q_select_fields;
+			vector<string> q_where_fields;
+			vector<ColumnBase::OP_TYPE> q_where_ops;
+			vector<int> q_where_value;
+
+			hsql::SQLStatement* stmt = pResult->getStatement(0);
+			if (stmt->type() == hsql::StatementType::kStmtSelect) {
+				hsql::SelectStatement* select = (hsql::SelectStatement*) stmt;
+				q_table = select->fromTable->getName();
+				cout << "Table name: " << q_table << endl;
+				for (hsql::Expr* expr : *select->selectList) {
+					if (expr->type == hsql::ExprType::kExprStar) {
+						q_select_fields.push_back("*");
+					}
+					else if (expr->type == hsql::ExprType::kExprColumnRef)
+						q_select_fields.push_back(expr->name);
+				}
+				for (size_t i = 0; i < q_select_fields.size(); i++) {
+					cout << "select fields[" << i << "] = " << q_select_fields[i] << endl;
+				}
+				if (select->whereClause != NULL) {
+					hsql::Expr* expr = select->whereClause;
+					if (expr->type == hsql::ExprType::kExprOperator) {
+						if (expr->op_type == hsql::Expr::OperatorType::SIMPLE_OP) {
+							q_where_fields.push_back(expr->expr->name);
+							if (expr->op_char == '>')
+								q_where_ops.push_back(ColumnBase::OP_TYPE::gtOp);
+							else if (expr->op_char == '<')
+								q_where_ops.push_back(ColumnBase::OP_TYPE::ltOp);
+							if (expr->expr2->type == hsql::ExprType::kExprLiteralInt)
+								q_where_value.push_back(expr->expr2->ival);
+						}
+						else if (expr->op_type == hsql::Expr::OperatorType::AND) {
+							hsql::Expr* expr1 = expr->expr;
+							hsql::Expr* expr2 = expr->expr2;
+							if (expr1->op_type == hsql::Expr::OperatorType::SIMPLE_OP) {
+								q_where_fields.push_back(expr1->expr->name);
+								if (expr1->op_char == '>')
+									q_where_ops.push_back(ColumnBase::OP_TYPE::gtOp);
+								else if (expr1->op_char == '<')
+									q_where_ops.push_back(ColumnBase::OP_TYPE::ltOp);
+								if (expr1->expr2->type == hsql::ExprType::kExprLiteralInt)
+									q_where_value.push_back(expr1->expr2->ival);
+							}
+							if (expr2->op_type == hsql::Expr::OperatorType::SIMPLE_OP) {
+								q_where_fields.push_back(expr2->expr->name);
+								if (expr2->op_char == '>')
+									q_where_ops.push_back(ColumnBase::OP_TYPE::gtOp);
+								else if (expr2->op_char == '<')
+									q_where_ops.push_back(ColumnBase::OP_TYPE::ltOp);
+								if (expr2->expr2->type == hsql::ExprType::kExprLiteralInt)
+									q_where_value.push_back(expr2->expr2->ival);
+							}
+						}
+					}
+					for (size_t i = 0; i < q_where_fields.size(); i++) {
+						cout << "fields[" << i << "] = " << q_where_fields[i] << endl;
+					}
+					for (size_t i = 0; i < q_where_ops.size(); i++) {
+						cout << "ops[" << i << "] = " << q_where_ops[i] << endl;
+					}
+					for (size_t i = 0; i < q_where_value.size(); i++) {
+						cout << "value[" << i << "] = " << q_where_value[i] << endl;
+					}
+				}
 			}
+			else
+				cout << "Please enter a SELECT query !!!" << endl;
 		}
-	} else {
-		printf("The SQL string is invalid!\n");
-		return -1;
+		if (!queryValid) {
+			printf("The SQL query is invalid!\n");
+			break;
+		}
 	}
 
 	/*// search on totalprice
@@ -181,10 +253,13 @@ int main(void) {
 	}
 
 
-
 	// display current time
 	t = time(NULL);
 	cout << "Now is " << ctime(&t) << endl;*/
+
+	string input;
+	cout << "Enter anything: ";
+	cin >> input;
 
 	return EXIT_SUCCESS;
 }
