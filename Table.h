@@ -20,15 +20,12 @@ private:
 	tuple<Column<T>...> m_columns;
 	string name;
 public:
-	Table();
-	virtual ~Table();
+	virtual ~Table() {
+		//delete &m_columns;
+	}
 
-	tuple<Column<T>...>* getColumnList() {
-		return &m_columns;
-	}
-	void setColumnList(tuple<Column<T>...>& colList) {
-		m_columns = colList;
-	}
+	Table(Column<T>*... columns) : m_columns () {}
+
 	string getName() {
 		return name;
 	}

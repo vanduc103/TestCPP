@@ -16,7 +16,7 @@ using namespace std;
 template<class T>
 class Dictionary {
 private:
-	vector<T> items;
+	vector<T>* items;
 public:
 	Dictionary();
 	virtual ~Dictionary();

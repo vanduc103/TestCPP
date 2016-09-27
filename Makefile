@@ -1,8 +1,8 @@
-CXXFLAGS =	-O2 -g -Wall -fmessage-length=0 -std=c++11
+CXXFLAGS =	-O2 -g -Wall -fmessage-length=0 -std=c++11 -lstdc++ -lsqlparser -L/usr/local/lib/ -I/home/duclv/work/sql-parser/src/
 
-OBJS =		TestCpp.o Dictionary.o Column.o ColumnBase.o
+OBJS =		TestCpp.o Table.o Dictionary.o Column.o ColumnBase.o
 
-LIBS =
+LIBS =		-L/usr/local/lib/ -lsqlparser
 
 TARGET =	TestCpp
 
