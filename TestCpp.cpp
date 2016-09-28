@@ -67,8 +67,8 @@ int main(void) {
 	string filePath;
 	//cin >> filePath;
 	//ifstream infile(filePath);
-	//ifstream infile("/home/duclv/Downloads/data1M.csv");
-	ifstream infile("/home/duclv/homework/data1M.csv");
+	ifstream infile("/home/duclv/Downloads/data1M.csv");
+	//ifstream infile("/home/duclv/homework/data1M.csv");
 	string line;
 	string delim = ",";
 	size_t pos = 0;
@@ -104,9 +104,9 @@ int main(void) {
 	cout << col2->getName() << " number of distinct values = " << colDict2->size() << endl;
 	cout << col3->getName() << " number of distinct values = " << colDict3->size() << endl;
 	col1->updateEncodedVecValue(colValue1, colDict1->size());
-	col2->updateEncodedVecValue(colValue2, colDict2->size());
-	col3->updateEncodedVecValue(colValue3, colDict3->size());
-	//col3->printEncodedVecValue(100);
+	//col2->updateEncodedVecValue(colValue2, colDict2->size());
+	//col3->updateEncodedVecValue(colValue3, colDict3->size());
+	//col1->printEncodedVecValue(100);
 
 	// init Table
 	vector<ColumnBase*> columns;
@@ -118,7 +118,7 @@ int main(void) {
 
 	// print result
 	//colDict2->print(100);
-	//col3->printVecValue(100);
+	//col1->printVecValue(10);
 	//colDict3->print(100);
 
 	// display current time
@@ -234,7 +234,7 @@ int main(void) {
 					vector<size_t>* new_q_resultJoin = new vector<size_t>();
 					for (size_t rowId = 0; !result.empty() && rowId < t->getEncodedVecValue()->size(); rowId++) {
 						// convert from bitset to encodeValue
-						size_t encodeValue = (t->getEncodedVecValue()->at(rowId)).to_ulong();
+						size_t encodeValue = (t->getEncodedVecValue()->at(rowId));
 						if (encodeValue >= result.front() && encodeValue <= result.back()) {
 							// first where expr
 							if (fidx == 0)
@@ -266,7 +266,7 @@ int main(void) {
 						for (size_t i = 0; i < q_resultJoin->size() && i < limit; i++) {
 							size_t rid = q_resultJoin->at(i);
 							// convert from bitset to encode value
-							size_t encodeValue = (t->getEncodedVecValue()->at(rid)).to_ulong();
+							size_t encodeValue = (t->getEncodedVecValue()->at(rid));
 							int* a = t->getDictionary()->lookup(encodeValue);
 							//cout << select_field_name << "[" << i << "] = " << *a << endl;
 							outputs[i+1] += to_string(*a) + ", ";
@@ -277,7 +277,7 @@ int main(void) {
 						for (size_t i = 0; i < q_resultJoin->size() && i < limit; i++) {
 							size_t rid = q_resultJoin->at(i);
 							// convert from bitset to encode value
-							size_t encodeValue = (t->getEncodedVecValue()->at(rid)).to_ulong();
+							size_t encodeValue = (t->getEncodedVecValue()->at(rid));
 							string* a = t->getDictionary()->lookup(encodeValue);
 							//cout << select_field_name << "[" << i << "] = " << *a << endl;
 							outputs[i+1] += *a + ", ";
