@@ -29,6 +29,8 @@ private:
 public:
 	Column() {
 		encodedVecValue = new vector<boost::dynamic_bitset<>>();
+		dictionary = new Dictionary<T>();
+		vecValue = new vector<size_t>();
 	}
 	virtual ~Column() {
 		delete vecValue;
@@ -54,6 +56,9 @@ public:
 		}
 		// delete vecValue
 		delete vecValue;
+	}
+	vector<boost::dynamic_bitset<>>* getEncodedVecValue() {
+		return encodedVecValue;
 	}
 	void printEncodedVecValue(int row) {
 		for (size_t i = 0; i < (*encodedVecValue).size() && i < row; i++) {

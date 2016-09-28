@@ -16,6 +16,7 @@
 #include <tuple>
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
+#include <boost/dynamic_bitset.hpp>
 
 #include "Dictionary.h"
 #include "Column.h"
@@ -66,12 +67,12 @@ int main(void) {
 	string filePath;
 	//cin >> filePath;
 	//ifstream infile(filePath);
-	ifstream infile("/home/duclv/Downloads/data1M.csv");
-	//ifstream infile("/home/duclv/homework/data1M.csv");
+	//ifstream infile("/home/duclv/Downloads/data1M.csv");
+	ifstream infile("/home/duclv/homework/data1M.csv");
 	string line;
 	string delim = ",";
 	size_t pos = 0;
-	int row = 0;
+	//int row = 0;
 	while(getline(infile, line)) {
 		char i = 0;
 		while ((pos = line.find(delim)) != string::npos) {
@@ -108,8 +109,12 @@ int main(void) {
 	//col3->printEncodedVecValue(100);
 
 	// init Table
-	Table<string, int, string> table (col1, col2, col3);
-	table.setName("orders");
+	vector<ColumnBase*> columns;
+	columns.push_back(col1);
+	columns.push_back(col2);
+	columns.push_back(col3);
+	Table* table = new Table(columns);
+	table->setName("orders");
 
 	// print result
 	//colDict2->print(100);
@@ -132,23 +137,27 @@ int main(void) {
 		hsql::SQLParserResult* pResult = hsql::SQLParser::parseSQLString(query);
 		// check whether the parsing was successfull
 		bool queryValid = pResult->isValid;
-		if (queryValid) {
+		while (queryValid) {
 			printf("Parsed successfully!\n");
 			// process the statements...
 			string q_table;
 			vector<string> q_select_fields;
 			vector<string> q_where_fields;
 			vector<ColumnBase::OP_TYPE> q_where_ops;
-			vector<int> q_where_value;
+			vector<int> q_where_values;
 
 			hsql::SQLStatement* stmt = pResult->getStatement(0);
 			if (stmt->type() == hsql::StatementType::kStmtSelect) {
 				hsql::SelectStatement* select = (hsql::SelectStatement*) stmt;
 				q_table = select->fromTable->getName();
 				cout << "Table name: " << q_table << endl;
+				if (q_table != table->getName()) {queryValid = false; break;}
+
 				for (hsql::Expr* expr : *select->selectList) {
 					if (expr->type == hsql::ExprType::kExprStar) {
-						q_select_fields.push_back("*");
+						q_select_fields.push_back("o_orderstatus");
+						q_select_fields.push_back("o_totalprice");
+						q_select_fields.push_back("o_comment");
 					}
 					else if (expr->type == hsql::ExprType::kExprColumnRef)
 						q_select_fields.push_back(expr->name);
@@ -156,6 +165,7 @@ int main(void) {
 				for (size_t i = 0; i < q_select_fields.size(); i++) {
 					cout << "select fields[" << i << "] = " << q_select_fields[i] << endl;
 				}
+
 				if (select->whereClause != NULL) {
 					hsql::Expr* expr = select->whereClause;
 					if (expr->type == hsql::ExprType::kExprOperator) {
@@ -166,7 +176,7 @@ int main(void) {
 							else if (expr->op_char == '<')
 								q_where_ops.push_back(ColumnBase::OP_TYPE::ltOp);
 							if (expr->expr2->type == hsql::ExprType::kExprLiteralInt)
-								q_where_value.push_back(expr->expr2->ival);
+								q_where_values.push_back(expr->expr2->ival);
 						}
 						else if (expr->op_type == hsql::Expr::OperatorType::AND) {
 							hsql::Expr* expr1 = expr->expr;
@@ -178,7 +188,7 @@ int main(void) {
 								else if (expr1->op_char == '<')
 									q_where_ops.push_back(ColumnBase::OP_TYPE::ltOp);
 								if (expr1->expr2->type == hsql::ExprType::kExprLiteralInt)
-									q_where_value.push_back(expr1->expr2->ival);
+									q_where_values.push_back(expr1->expr2->ival);
 							}
 							if (expr2->op_type == hsql::Expr::OperatorType::SIMPLE_OP) {
 								q_where_fields.push_back(expr2->expr->name);
@@ -187,79 +197,111 @@ int main(void) {
 								else if (expr2->op_char == '<')
 									q_where_ops.push_back(ColumnBase::OP_TYPE::ltOp);
 								if (expr2->expr2->type == hsql::ExprType::kExprLiteralInt)
-									q_where_value.push_back(expr2->expr2->ival);
+									q_where_values.push_back(expr2->expr2->ival);
 							}
+						}
+						else {
+							// not support
+							queryValid = false;
+							break;
 						}
 					}
 					for (size_t i = 0; i < q_where_fields.size(); i++) {
-						cout << "fields[" << i << "] = " << q_where_fields[i] << endl;
+						cout << "where fields[" << i << "] = " << q_where_fields[i] << endl;
 					}
 					for (size_t i = 0; i < q_where_ops.size(); i++) {
-						cout << "ops[" << i << "] = " << q_where_ops[i] << endl;
+						cout << "where operators[" << i << "] = " << q_where_ops[i] << endl;
 					}
-					for (size_t i = 0; i < q_where_value.size(); i++) {
-						cout << "value[" << i << "] = " << q_where_value[i] << endl;
+					for (size_t i = 0; i < q_where_values.size(); i++) {
+						cout << "value values[" << i << "] = " << q_where_values[i] << endl;
 					}
 				}
+				// execute query
+				vector<size_t>* q_resultJoin = new vector<size_t>(); // contain query result row id
+				vector<vector<size_t>> q_results;
+				for (size_t fidx = 0; fidx < q_where_fields.size(); fidx++) {
+					string q_where_field = q_where_fields[fidx];
+					ColumnBase::OP_TYPE q_where_op = q_where_ops[fidx];
+					int q_where_value = q_where_values[fidx];
+
+					Column<int>* t = (Column<int>*) table->getColumnByName(q_where_field);
+					if (t == NULL)
+						continue;
+					vector<size_t> result;
+					t->getDictionary()->search(q_where_value, q_where_op, result);
+
+					// find rowId with appropriate encodeValue
+					vector<size_t>* new_q_resultJoin = new vector<size_t>();
+					for (size_t rowId = 0; !result.empty() && rowId < t->getEncodedVecValue()->size(); rowId++) {
+						// convert from bitset to encodeValue
+						size_t encodeValue = (t->getEncodedVecValue()->at(rowId)).to_ulong();
+						if (encodeValue >= result.front() && encodeValue <= result.back()) {
+							// first where expr
+							if (fidx == 0)
+								q_resultJoin->push_back(rowId);
+							else {
+								// only keep rid that existed on previous rid vector
+								if (binary_search(q_resultJoin->begin(), q_resultJoin->end(), rowId))
+									new_q_resultJoin->push_back(rowId);
+							}
+						}
+					}
+					// reassign new rid vector to previous rid vector
+					if (fidx > 0) {
+						delete q_resultJoin;
+						q_resultJoin = new_q_resultJoin;
+					}
+				}
+				// print result
+				size_t limit = 10;
+				vector<string> outputs (limit + 1);
+				for (size_t idx = 0; idx < q_select_fields.size(); idx++) {
+					string select_field_name = q_select_fields[idx];
+					outputs[0] += select_field_name + ", ";
+					ColumnBase* colBase = (ColumnBase*) table->getColumnByName(select_field_name);
+					if (colBase == NULL)
+						continue;
+					if (colBase->getType() == ColumnBase::intType) {
+						Column<int>* t = (Column<int>*) colBase;
+						for (size_t i = 0; i < q_resultJoin->size() && i < limit; i++) {
+							size_t rid = q_resultJoin->at(i);
+							// convert from bitset to encode value
+							size_t encodeValue = (t->getEncodedVecValue()->at(rid)).to_ulong();
+							int* a = t->getDictionary()->lookup(encodeValue);
+							//cout << select_field_name << "[" << i << "] = " << *a << endl;
+							outputs[i+1] += to_string(*a) + ", ";
+						}
+					}
+					else {
+						Column<string>* t = (Column<string>*) colBase;
+						for (size_t i = 0; i < q_resultJoin->size() && i < limit; i++) {
+							size_t rid = q_resultJoin->at(i);
+							// convert from bitset to encode value
+							size_t encodeValue = (t->getEncodedVecValue()->at(rid)).to_ulong();
+							string* a = t->getDictionary()->lookup(encodeValue);
+							//cout << select_field_name << "[" << i << "] = " << *a << endl;
+							outputs[i+1] += *a + ", ";
+						}
+					}
+				}
+				for (string output : outputs) {
+					cout << output << endl;
+				}
+				cout << "Showing only "<<limit<<" result !" << endl;
+				// Processe done !
+				break;
 			}
 			else
 				cout << "Please enter a SELECT query !!!" << endl;
 		}
 		if (!queryValid) {
-			printf("The SQL query is invalid!\n");
-			break;
+			printf("The SQL query is invalid or not supported !!!\n");
 		}
 	}
-
-	/*// search on totalprice
-	int searchTotalprice = 56789;
-	cout << "Select totalprice > " << searchTotalprice << endl;
-	vector<size_t> result;
-	colDict2->search(searchTotalprice, ColumnBase::gtOp, result);
-	// print result
-	for (size_t i = 0; i < result.size() && i < 100; i++) {
-		size_t encode = result[i];
-		int * a = colDict2->lookup(encode);
-		for (size_t j = 0; j < (*colValue2).size(); j++) {
-			if (encode == (*colValue2)[j]) {
-				cout << "Result[" << j << "] = " << *a << endl;
-			}
-		}
-	}
-
-	// search 2
-	int totalprice1 = 5678;
-	int totalprice2 = 56789;
-	cout << "-------------------------" << endl;
-	cout << "Select " << totalprice1 << " < totalprice < " << totalprice2 << endl;
-	vector<size_t> result1;
-	colDict2->search(totalprice1, ColumnBase::gtOp, result1);
-	vector<size_t> result2;
-	colDict2->search(totalprice2, ColumnBase::ltOp, result2);
-	vector<size_t> resultJoin;
-	// join from min value of result1 to max value of result2
-	for (size_t i = result1.front(); i < result2.back(); i++) {
-		resultJoin.push_back(i);
-	}
-	// print result
-	for (size_t i = 0; i < resultJoin.size() && i < 100; i++) {
-		size_t encode = resultJoin[i];
-		int * a = colDict2->lookup(encode);
-		for (size_t j = 0; j < (*colValue2).size(); j++) {
-			if (encode == (*colValue2)[j]) {
-				cout << "Result[" << j << "] = " << *a << endl;
-			}
-		}
-	}
-
-
-	// display current time
-	t = time(NULL);
-	cout << "Now is " << ctime(&t) << endl;*/
 
 	string input;
-	cout << "Enter anything: ";
-	cin >> input;
+	cout << "Enter anything to quit: ";
+	getline(cin, input);
 
 	return EXIT_SUCCESS;
 }
