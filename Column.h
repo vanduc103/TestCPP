@@ -56,26 +56,27 @@ public:
 	}
 	void updateEncodedVecValue(vector<size_t>* vecValue, size_t sizeOfDict) {
 		size_t numOfBit = (size_t) ceil(log2((double) sizeOfDict));
-		packed = PackedArray_create(numOfBit, vecValue->size());
+		/*packed = PackedArray_create(numOfBit, vecValue->size());
 		uint32_t mask = (uint32_t)(1ULL << packed->bitsPerItem) - 1;
 		uint32_t v = 25 & mask;
 		cout << "v init = " << v << endl;
 		PackedArray_set(packed, 0, v);
-		cout << "v = " << PackedArray_get(packed, 0) << endl;
+		cout << "v = " << PackedArray_get(packed, 0) << endl;*/
 		for (size_t i = 0; i < vecValue->size(); i++) {
-			//encodedVecValue->push_back(boost::dynamic_bitset<>(numOfBit, vecValue->at(i)));
+			encodedVecValue->push_back(boost::dynamic_bitset<>(numOfBit, vecValue->at(i)));
 			//PackedArray_set(packed, i, 100 & mask);
 		}
 		// delete vecValue
 		vecValue->resize(0);
 	}
-	vector<size_t>* getEncodedVecValue() {
+	vector<boost::dynamic_bitset<>>* getEncodedVecValue() {
 		//vecValue = new vector<size_t>();
-		uint32_t mask = (uint32_t)(1ULL << packed->bitsPerItem) - 1;
+		/*uint32_t mask = (uint32_t)(1ULL << packed->bitsPerItem) - 1;
 		for (int i = 0; i < packed->count; i++) {
 			vecValue->push_back(PackedArray_get(packed, i) & mask);
 		}
-		return vecValue;
+		return vecValue;*/
+		return encodedVecValue;
 	}
 	void printEncodedVecValue(int row) {
 		for (size_t i = 0; i < (*encodedVecValue).size() && i < row; i++) {

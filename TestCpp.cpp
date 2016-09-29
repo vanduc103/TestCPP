@@ -67,8 +67,8 @@ int main(void) {
 	string filePath;
 	//cin >> filePath;
 	//ifstream infile(filePath);
-	ifstream infile("/home/duclv/Downloads/data1M.csv");
-	//ifstream infile("/home/duclv/homework/data1M.csv");
+	//ifstream infile("/home/duclv/Downloads/data1M.csv");
+	ifstream infile("/home/duclv/homework/data1M.csv");
 	string line;
 	string delim = ",";
 	size_t pos = 0;
@@ -91,8 +91,8 @@ int main(void) {
 		    }
 		    // comment is 4th column
 		    else if (i == 4) {
-		    	boost::erase_all(token, "\"");
-		    	boost::trim(token);
+		    	//boost::erase_all(token, "\"");
+		    	//boost::trim(token);
 		    	colDict3->addNewElement(token, *colValue3);
 		    }
 		}
@@ -104,8 +104,8 @@ int main(void) {
 	cout << col2->getName() << " number of distinct values = " << colDict2->size() << endl;
 	cout << col3->getName() << " number of distinct values = " << colDict3->size() << endl;
 	col1->updateEncodedVecValue(colValue1, colDict1->size());
-	//col2->updateEncodedVecValue(colValue2, colDict2->size());
-	//col3->updateEncodedVecValue(colValue3, colDict3->size());
+	col2->updateEncodedVecValue(colValue2, colDict2->size());
+	col3->updateEncodedVecValue(colValue3, colDict3->size());
 	//col1->printEncodedVecValue(100);
 
 	// init Table
@@ -217,7 +217,7 @@ int main(void) {
 					}
 				}
 				// execute query
-				vector<size_t>* q_resultJoin = new vector<size_t>(); // contain query result row id
+				vector<bool>* q_resultRid = new vector<bool>(); // contain query result row id
 				vector<vector<size_t>> q_results;
 				for (size_t fidx = 0; fidx < q_where_fields.size(); fidx++) {
 					string q_where_field = q_where_fields[fidx];
@@ -231,26 +231,34 @@ int main(void) {
 					t->getDictionary()->search(q_where_value, q_where_op, result);
 
 					// find rowId with appropriate encodeValue
-					vector<size_t>* new_q_resultJoin = new vector<size_t>();
+					//vector<bool>* new_q_resultRid = new vector<bool>();
 					for (size_t rowId = 0; !result.empty() && rowId < t->getEncodedVecValue()->size(); rowId++) {
 						// convert from bitset to encodeValue
-						size_t encodeValue = (t->getEncodedVecValue()->at(rowId));
+						size_t encodeValue = (t->getEncodedVecValue()->at(rowId)).to_ulong();
 						if (encodeValue >= result.front() && encodeValue <= result.back()) {
 							// first where expr
 							if (fidx == 0)
-								q_resultJoin->push_back(rowId);
+								q_resultRid->push_back(1); //rowId is in query result
 							else {
 								// only keep rid that existed on previous rid vector
-								if (binary_search(q_resultJoin->begin(), q_resultJoin->end(), rowId))
-									new_q_resultJoin->push_back(rowId);
+								if (q_resultRid->at(rowId)) {
+									// keep this row id in result - do nothing
+								}
 							}
 						}
+						else {
+							// rowId is not in query result
+							if(fidx == 0)
+								q_resultRid->push_back(0);
+							else
+								q_resultRid->at(rowId) = 0;
+						}
 					}
-					// reassign new rid vector to previous rid vector
+					/*// reassign new rid vector to previous rid vector
 					if (fidx > 0) {
-						delete q_resultJoin;
-						q_resultJoin = new_q_resultJoin;
-					}
+						delete q_resultRid;
+						q_resultRid = new_q_resultRid;
+					}*/
 				}
 				// print result
 				size_t limit = 10;
@@ -261,26 +269,29 @@ int main(void) {
 					ColumnBase* colBase = (ColumnBase*) table->getColumnByName(select_field_name);
 					if (colBase == NULL)
 						continue;
+					size_t limitCount = 0;
 					if (colBase->getType() == ColumnBase::intType) {
 						Column<int>* t = (Column<int>*) colBase;
-						for (size_t i = 0; i < q_resultJoin->size() && i < limit; i++) {
-							size_t rid = q_resultJoin->at(i);
+						for (size_t i = 0; i < q_resultRid->size() && q_resultRid->at(i); i++) {
+							size_t rid = i; //q_resultRid->at(i);
 							// convert from bitset to encode value
-							size_t encodeValue = (t->getEncodedVecValue()->at(rid));
+							size_t encodeValue = (t->getEncodedVecValue()->at(rid)).to_ulong();
 							int* a = t->getDictionary()->lookup(encodeValue);
-							//cout << select_field_name << "[" << i << "] = " << *a << endl;
-							outputs[i+1] += to_string(*a) + ", ";
+							outputs[limitCount+1] += to_string(*a) + ", ";
+							if (++limitCount >= limit)
+								break;
 						}
 					}
 					else {
 						Column<string>* t = (Column<string>*) colBase;
-						for (size_t i = 0; i < q_resultJoin->size() && i < limit; i++) {
-							size_t rid = q_resultJoin->at(i);
+						for (size_t i = 0; i < q_resultRid->size() && q_resultRid->at(i); i++) {
+							size_t rid = i; //q_resultRid->at(i);
 							// convert from bitset to encode value
-							size_t encodeValue = (t->getEncodedVecValue()->at(rid));
+							size_t encodeValue = (t->getEncodedVecValue()->at(rid)).to_ulong();
 							string* a = t->getDictionary()->lookup(encodeValue);
-							//cout << select_field_name << "[" << i << "] = " << *a << endl;
-							outputs[i+1] += *a + ", ";
+							outputs[limitCount+1] += *a + ", ";
+							if (++limitCount >= limit)
+								break;
 						}
 					}
 				}
