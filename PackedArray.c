@@ -515,7 +515,7 @@ void PackedArray_set(PackedArray* a, const uint32_t offset, const uint32_t in)
   bitsAvailable = 32 - startBit;
 
   mask = (uint32_t)(1ULL << bitsPerItem) - 1;
-  //PACKEDARRAY_ASSERT(0 == (~mask & in));
+  PACKEDARRAY_ASSERT(0 == (~mask & in));
 
   if (bitsPerItem <= bitsAvailable)
   {

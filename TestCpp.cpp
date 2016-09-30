@@ -30,45 +30,48 @@ class TestCPP {
 };
 
 int main(void) {
-	puts("Hello World!!!");
+	puts("***** Simple Column-Store Database start ******");
+
+	// Column 0
+	Column<int>* col0 = new Column<int>();
+	col0->setName("o_orderkey");
+	col0->setType(ColumnBase::intType);
+	col0->setSize(4);
 
 	// Column 1
 	Column<string>* col1 = new Column<string>();
 	col1->setName("o_orderstatus");
 	col1->setType(ColumnBase::charType);
 	col1->setSize(1);
-	Dictionary<string>* colDict1 = col1->getDictionary();
-	vector<size_t>* colValue1 = col1->getVecValue();
+	//Dictionary<string>* colDict1 = col1->getDictionary();
+	//vector<size_t>* colValue1 = col1->getVecValue();
 
 	// Column 2
 	Column<int>* col2 = new Column<int>();
 	col2->setName("o_totalprice");
 	col2->setType(ColumnBase::intType);
 	col2->setSize(4);
-	Dictionary<int>* colDict2 = col2->getDictionary();
-	vector<size_t>* colValue2 = col2->getVecValue();
+	//Dictionary<int>* colDict2 = col2->getDictionary();
+	//vector<size_t>* colValue2 = col2->getVecValue();
 
 	// Column 3
 	Column<string>* col3 = new Column<string>();
 	col3->setName("o_comment");
 	col3->setType(ColumnBase::charType);
 	col3->setSize(30);
-	Dictionary<string>* colDict3 = col3->getDictionary();
-	vector<size_t>* colValue3 = col3->getVecValue();
+	//Dictionary<string>* colDict3 = col3->getDictionary();
+	//vector<size_t>* colValue3 = col3->getVecValue();
 
-	//get the starting value of clock
-	//clock_t start = clock();
-	// display current time
-	time_t t = time(NULL);
-	cout << "Now is " << ctime(&t) << endl;
+	// calculate time execution
+	clock_t begin_time = clock();
 
 	// read file
-	//cout << "Enter file path: ";
+	cout << "Enter file path: ";
 	string filePath;
-	//cin >> filePath;
-	//ifstream infile(filePath);
+	getline(cin, filePath);
+	ifstream infile(filePath);
 	//ifstream infile("/home/duclv/Downloads/data1M.csv");
-	ifstream infile("/home/duclv/homework/data1M.csv");
+	//ifstream infile("/home/duclv/homework/data1M.csv");
 	string line;
 	string delim = ",";
 	size_t pos = 0;
@@ -80,33 +83,45 @@ int main(void) {
 		    //std::cout << token << std::endl;
 		    line.erase(0, pos + delim.length());
 		    i++;
+		    // key is 1st column
+			if (i == 1) {
+				int key = stoi(token);
+				// no encode by dictionary
+				col0->updateVecValue(key);
+			}
 		    // status is 2nd column
-		    if (i == 2) {
-		    	colDict1->addNewElement(token, *colValue1);
+			else if (i == 2) {
+		    	//colDict1->addNewElement(token, *colValue1);
+		    	col1->updateDictionary(token);
 		    }
 		    // totalprice is 3rd column
 		    else if (i == 3) {
 		    	int totalprice = stoi(token);
-		    	colDict2->addNewElement(totalprice, *colValue2);
+		    	//colDict2->addNewElement(totalprice, *colValue2);
+		    	col2->updateDictionary(totalprice);
 		    }
 		    // comment is 4th column
 		    else if (i == 4) {
 		    	//boost::erase_all(token, "\"");
 		    	//boost::trim(token);
-		    	colDict3->addNewElement(token, *colValue3);
+		    	//colDict3->addNewElement(token, *colValue3);
+		    	col3->updateDictionary(token);
 		    }
 		}
 		//cout << "Row: " << ++row << endl;
 	}
 	infile.close();
-	// update encoded velue vector
-	cout << col1->getName() << " number of distinct values = " << colDict1->size() << endl;
-	cout << col2->getName() << " number of distinct values = " << colDict2->size() << endl;
-	cout << col3->getName() << " number of distinct values = " << colDict3->size() << endl;
-	col1->updateEncodedVecValue(colValue1, colDict1->size());
-	col2->updateEncodedVecValue(colValue2, colDict2->size());
-	col3->updateEncodedVecValue(colValue3, colDict3->size());
-	//col1->printEncodedVecValue(100);
+	// update encoded value vector
+	cout << col0->getName() << " number of distinct values = " << col1->getDictionary()->size() << endl;
+	cout << col1->getName() << " number of distinct values = " << col1->getDictionary()->size() << endl;
+	cout << col2->getName() << " number of distinct values = " << col2->getDictionary()->size() << endl;
+	cout << col3->getName() << " number of distinct values = " << col3->getDictionary()->size() << endl;
+	//col1->updateEncodedVecValue(colValue1, colDict1->size());
+	//col2->updateEncodedVecValue(colValue2, colDict2->size());
+	//col3->updateEncodedVecValue(colValue3, colDict3->size());
+	col1->bitPackingVecValue();
+	col2->bitPackingVecValue();
+	col3->bitPackingVecValue();
 
 	// init Table
 	vector<ColumnBase*> columns;
@@ -117,13 +132,12 @@ int main(void) {
 	table->setName("orders");
 
 	// print result
-	//colDict2->print(100);
 	//col1->printVecValue(10);
-	//colDict3->print(100);
+	//col2->printVecValue(10);
+	//col3->printVecValue(10);
 
-	// display current time
-	t = time(NULL);
-	cout << "Now is " << ctime(&t) << endl;
+	// loaded time
+	cout << "Table Load time: " << float( clock () - begin_time ) /  CLOCKS_PER_SEC << " seconds " << endl;
 
 	// query
 	while (true) {
@@ -133,6 +147,7 @@ int main(void) {
 		if ("quit" == query)
 			break;
 
+		begin_time = clock();
 		// parse a given query
 		hsql::SQLParserResult* pResult = hsql::SQLParser::parseSQLString(query);
 		// check whether the parsing was successfull
@@ -175,6 +190,8 @@ int main(void) {
 								q_where_ops.push_back(ColumnBase::OP_TYPE::gtOp);
 							else if (expr->op_char == '<')
 								q_where_ops.push_back(ColumnBase::OP_TYPE::ltOp);
+							else if (expr->op_char == '=')
+								q_where_ops.push_back(ColumnBase::OP_TYPE::equalOp);
 							if (expr->expr2->type == hsql::ExprType::kExprLiteralInt)
 								q_where_values.push_back(expr->expr2->ival);
 						}
@@ -196,6 +213,8 @@ int main(void) {
 									q_where_ops.push_back(ColumnBase::OP_TYPE::gtOp);
 								else if (expr2->op_char == '<')
 									q_where_ops.push_back(ColumnBase::OP_TYPE::ltOp);
+								else if (expr2->op_char == '=')
+									q_where_ops.push_back(ColumnBase::OP_TYPE::equalOp);
 								if (expr2->expr2->type == hsql::ExprType::kExprLiteralInt)
 									q_where_values.push_back(expr2->expr2->ival);
 							}
@@ -231,10 +250,10 @@ int main(void) {
 					t->getDictionary()->search(q_where_value, q_where_op, result);
 
 					// find rowId with appropriate encodeValue
-					//vector<bool>* new_q_resultRid = new vector<bool>();
-					for (size_t rowId = 0; !result.empty() && rowId < t->getEncodedVecValue()->size(); rowId++) {
+					for (size_t rowId = 0; !result.empty() && rowId < t->vecValueSize(); rowId++) {
 						// convert from bitset to encodeValue
-						size_t encodeValue = (t->getEncodedVecValue()->at(rowId)).to_ulong();
+						//size_t encodeValue = (t->getEncodedVecValue()->at(rowId)).to_ulong();
+						size_t encodeValue = t->vecValueAt(rowId);
 						if (encodeValue >= result.front() && encodeValue <= result.back()) {
 							// first where expr
 							if (fidx == 0)
@@ -254,12 +273,11 @@ int main(void) {
 								q_resultRid->at(rowId) = 0;
 						}
 					}
-					/*// reassign new rid vector to previous rid vector
-					if (fidx > 0) {
-						delete q_resultRid;
-						q_resultRid = new_q_resultRid;
-					}*/
 				}
+				/*for (size_t rid = 0; rid < q_resultRid->size(); rid++) {
+					if (q_resultRid->at(rid))
+						cout << rid << endl;
+				}*/
 				// print result
 				size_t limit = 10;
 				vector<string> outputs (limit + 1);
@@ -272,26 +290,32 @@ int main(void) {
 					size_t limitCount = 0;
 					if (colBase->getType() == ColumnBase::intType) {
 						Column<int>* t = (Column<int>*) colBase;
-						for (size_t i = 0; i < q_resultRid->size() && q_resultRid->at(i); i++) {
-							size_t rid = i; //q_resultRid->at(i);
-							// convert from bitset to encode value
-							size_t encodeValue = (t->getEncodedVecValue()->at(rid)).to_ulong();
-							int* a = t->getDictionary()->lookup(encodeValue);
-							outputs[limitCount+1] += to_string(*a) + ", ";
-							if (++limitCount >= limit)
-								break;
+						for (size_t rid = 0; rid < q_resultRid->size(); rid++) {
+							//size_t rid = i;
+							if (q_resultRid->at(rid)) {
+								// convert from bitset to encode value
+								//size_t encodeValue = (t->getEncodedVecValue()->at(rid)).to_ulong();
+								size_t encodeValue = t->vecValueAt(rid);
+								int* a = t->getDictionary()->lookup(encodeValue);
+								outputs[limitCount+1] += to_string(*a) + ", ";
+								if (++limitCount >= limit)
+									break;
+							}
 						}
 					}
 					else {
 						Column<string>* t = (Column<string>*) colBase;
-						for (size_t i = 0; i < q_resultRid->size() && q_resultRid->at(i); i++) {
-							size_t rid = i; //q_resultRid->at(i);
-							// convert from bitset to encode value
-							size_t encodeValue = (t->getEncodedVecValue()->at(rid)).to_ulong();
-							string* a = t->getDictionary()->lookup(encodeValue);
-							outputs[limitCount+1] += *a + ", ";
-							if (++limitCount >= limit)
-								break;
+						for (size_t rid = 0; rid < q_resultRid->size(); rid++) {
+							//size_t rid = i;
+							if (q_resultRid->at(rid)) {
+								// convert from bitset to encode value
+								//size_t encodeValue = (t->getEncodedVecValue()->at(rid)).to_ulong();
+								size_t encodeValue = t->vecValueAt(rid);
+								string* a = t->getDictionary()->lookup(encodeValue);
+								outputs[limitCount+1] += *a + ", ";
+								if (++limitCount >= limit)
+									break;
+							}
 						}
 					}
 				}
@@ -299,6 +323,8 @@ int main(void) {
 					cout << output << endl;
 				}
 				cout << "Showing only "<<limit<<" result !" << endl;
+				// query time
+				std::cout << "Table Selection time: " << float(clock() - begin_time)/CLOCKS_PER_SEC << " seconds " << endl;
 				// Processe done !
 				break;
 			}
@@ -309,10 +335,6 @@ int main(void) {
 			printf("The SQL query is invalid or not supported !!!\n");
 		}
 	}
-
-	string input;
-	cout << "Enter anything to quit: ";
-	getline(cin, input);
 
 	return EXIT_SUCCESS;
 }
