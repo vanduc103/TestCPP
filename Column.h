@@ -12,7 +12,7 @@
 #include <math.h>
 #include <iostream>
 #include <boost/dynamic_bitset.hpp>
-#include <bitset>
+#include <vector>
 #include "ColumnBase.h"
 #include "Dictionary.h"
 #include "PackedArray.h"
@@ -121,6 +121,7 @@ public:
 		return dictionary;
 	}
 
+	// Update new value for dictionary
 	void updateDictionary(T& value) {
 		dictionary->addNewElement(value, vecValue);
 	}
