@@ -98,18 +98,17 @@ int main(void) {
 		    // key is 1st column
 			if (i == 1) {
 				int key = stoi(token);
-				// no encode by dictionary
-				col0->updateVecValue(key);
+				col0->updateDictionary(key, false);
 			}
 		    // status is 2nd column
 			else if (i == 2) {
 				boost::replace_all(token, "\"", "");
-		    	col1->updateDictionary(token);
+		    	col1->updateDictionary(token, false);
 		    }
 		    // totalprice is 3rd column
 		    else if (i == 3) {
 		    	int totalprice = stoi(token);
-		    	col2->updateDictionary(totalprice);
+		    	col2->updateDictionary(totalprice, true);
 		    }
 		    // comment is from 4th column
 			if (i >= 4) comment += token + delim;
@@ -118,18 +117,21 @@ int main(void) {
 		token = line.substr(last);
 		comment += token;
 		boost::replace_all(comment, "\"", "");
-		col3->updateDictionary(comment);
-		//cout << "Row: " << ++row << endl;
+		col3->updateDictionary(comment, false);
 	}
 	infile.close();
-	// update encoded value vector
+	// print distinct numbers
 	cout << col0->getName() << " number of distinct values = " << col0->getDictionary()->size() << endl;
 	cout << col1->getName() << " number of distinct values = " << col1->getDictionary()->size() << endl;
 	cout << col2->getName() << " number of distinct values = " << col2->getDictionary()->size() << endl;
 	cout << col3->getName() << " number of distinct values = " << col3->getDictionary()->size() << endl;
-	//col1->updateEncodedVecValue(colValue1, colDict1->size());
-	//col2->updateEncodedVecValue(colValue2, colDict2->size());
-	//col3->updateEncodedVecValue(colValue3, colDict3->size());
+	// clear temporary memory
+	col0->getDictionary()->clearTemp();
+	col1->getDictionary()->clearTemp();
+	col2->getDictionary()->clearTemp();
+	col3->getDictionary()->clearTemp();
+	// bit packing
+	col0->bitPackingVecValue();
 	col1->bitPackingVecValue();
 	col2->bitPackingVecValue();
 	col3->bitPackingVecValue();
@@ -181,12 +183,16 @@ int main(void) {
 
 				for (hsql::Expr* expr : *select->selectList) {
 					if (expr->type == hsql::ExprType::kExprStar) {
+						q_select_fields.push_back("o_orderkey");
 						q_select_fields.push_back("o_orderstatus");
 						q_select_fields.push_back("o_totalprice");
 						q_select_fields.push_back("o_comment");
 					}
 					else if (expr->type == hsql::ExprType::kExprColumnRef)
 						q_select_fields.push_back(expr->name);
+					else if (expr->type == hsql::ExprType::kExprFunctionRef) {
+						q_select_fields.push_back(string(expr->name) + string("#") + string(expr->expr->name));
+					}
 				}
 				for (size_t i = 0; i < q_select_fields.size(); i++) {
 					cout << "select fields[" << i << "] = " << q_select_fields[i] << endl;

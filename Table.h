@@ -23,7 +23,7 @@ private:
 	string name;
 public:
 	virtual ~Table() {
-		//delete &m_columns;
+		delete m_columns;
 	}
 
 	Table(vector<ColumnBase*>& columns) {

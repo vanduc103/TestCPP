@@ -11,13 +11,25 @@
 #include <stdlib.h>
 #include <string>
 #include <iostream>
+#include <map>
 #include "Dictionary.h"
 
 using namespace std;
 
 template<class T>
+bool compFunc(T value1, T value2) {
+	return value1 < value2;
+};
+
+template<class T>
+bool equalFunc(T value1, T value2) {
+	return value1 == value2;
+};
+
+template<class T>
 Dictionary<T>::Dictionary() {
 	items = new vector<T>();
+	sMap = new map<T, size_t, classcomp>();
 }
 
 template<class T>
@@ -27,17 +39,6 @@ T* Dictionary<T>::lookup(size_t index) {
 	} else {
 		return &items->at(index);
 	}
-}
-
-template<class T>
-bool compFunc(T value1, T value2) {
-	//cout << "compare " << value1 << " , " << value2 << ". result: " << (value1 < value2) << "\n";
-	return value1 < value2;
-}
-
-template<class T>
-bool equalFunc(T value1, T value2) {
-	return value1 == value2;
 }
 
 template<class T>
@@ -134,17 +135,28 @@ void Dictionary<T>::search(T& value, ColumnBase::OP_TYPE opType, vector<size_t>&
 }
 
 template<class T>
-size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue) {
+size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue, bool sorted) {
 	if (items->empty()) {
 		items->push_back(value);
 		vecValue->push_back(0);
+		(*sMap)[value] = 1;
 		return 0;
+	} else if (!sorted) {
+		// check if value existed on dictionary
+		if ((*sMap)[value] == 0) {
+			items->push_back(value);
+			vecValue->push_back(items->size() - 1);
+			(*sMap)[value] = vecValue->back() + 1;
+		}
+		else {
+			vecValue->push_back((*sMap)[value] - 1);
+		}
+		return vecValue->back();
 	} else {
 		// find the lower bound for value in vector
 		typename vector<T>::iterator lower;
 		lower = std::lower_bound(items->begin(), items->end(), value,
 				compFunc<T>);
-		//cout << "compFunc(" << value <<", " << *lower <<") is "<< compFunc(value, *lower) <<"\n";
 		// value existed
 		if (lower != items->end() && equalFunc(value, *lower)) {
 			// return the position of lower
@@ -178,6 +190,7 @@ size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue) {
 	}
 }
 
+
 template<class T>
 size_t Dictionary<T>::size() {
 	return items->size();
@@ -193,6 +206,7 @@ void Dictionary<T>::print(int row) {
 template<class T>
 Dictionary<T>::~Dictionary() {
 	delete items;
+	delete sMap;
 }
 
 template class Dictionary<string> ;

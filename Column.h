@@ -122,8 +122,8 @@ public:
 	}
 
 	// Update new value for dictionary
-	void updateDictionary(T& value) {
-		dictionary->addNewElement(value, vecValue);
+	void updateDictionary(T& value, bool sorted = true) {
+		dictionary->addNewElement(value, vecValue, sorted);
 	}
 };
 
