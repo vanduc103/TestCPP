@@ -13,6 +13,7 @@
 #include <iostream>
 #include <boost/dynamic_bitset.hpp>
 #include <vector>
+#include <string>
 #include "ColumnBase.h"
 #include "Dictionary.h"
 #include "PackedArray.h"
@@ -124,6 +125,50 @@ public:
 	// Update new value for dictionary
 	void updateDictionary(T& value, bool sorted = true) {
 		dictionary->addNewElement(value, vecValue, sorted);
+	}
+
+	bool selection(T& searchValue, ColumnBase::OP_TYPE q_where_op,
+					vector<bool>* q_resultRid, bool initQueryResult) {
+		vector<size_t> result;
+		this->getDictionary()->search(searchValue, q_where_op, result);
+
+		// find rowId with appropriate encodeValue
+		for (size_t rowId = 0; !result.empty() && rowId < this->vecValueSize(); rowId++) {
+			size_t encodeValue = this->vecValueAt(rowId);
+			if (encodeValue >= result.front() && encodeValue <= result.back()) {
+				// first where expr => used to init query result
+				if (initQueryResult)
+					q_resultRid->push_back(true); //rowId is in query result
+				else {
+					if (q_resultRid->at(rowId)) {
+						// keep this row id in result - do nothing
+					}
+				}
+			}
+			else {
+				// rowId is not in query result
+				if(initQueryResult)
+					q_resultRid->push_back(false);
+				else
+					q_resultRid->at(rowId) = false;
+			}
+		}
+		return true;
+	}
+
+	vector<T> projection(vector<bool>* q_resultRid, size_t limit, size_t& limitCount) {
+		vector<T> outputs; // output result
+		limitCount = 0; // reset limit count
+		for (size_t rid = 0; rid < q_resultRid->size(); rid++) {
+			if (q_resultRid->at(rid)) {
+				size_t encodeValue = this->vecValueAt(rid);
+				T* a = this->getDictionary()->lookup(encodeValue);
+				outputs.push_back(*a);
+				if (++limitCount >= limit) break;
+			}
+		}
+
+		return outputs;
 	}
 };
 
