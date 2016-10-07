@@ -49,6 +49,31 @@ std::ostream& operator<<(std::ostream& out, const ColumnBase::OP_TYPE value){
 int main(void) {
 	puts("***** Simple Column-Store Database start ******");
 
+	string createQuery;
+	cout << "Create table statement: " << endl;
+	getline(cin, createQuery);
+	hsql::SQLParserResult* pCreateQuery = hsql::SQLParser::parseSQLString(createQuery);
+	string tableName;
+	string createTableStmt;
+	if (pCreateQuery->isValid) {
+		hsql::SQLStatement* stmt = pCreateQuery->getStatement(0);
+		if (stmt->type() == hsql::StatementType::kStmtCreate) {
+			hsql::CreateStatement* createStmt = (hsql::CreateStatement*) stmt;
+			tableName = createStmt->tableName;
+			createTableStmt = createStmt->filePath;
+		}
+	}
+	else {
+		cout << "Create table statement is Invalid !" << endl;
+		return -1;
+	}
+
+	// init table
+	vector<ColumnBase*> columns;
+	Table* table = new Table(columns);
+	table->setName(tableName);
+
+
 	// Column 0
 	Column<int>* col0 = new Column<int>();
 	col0->setName("o_orderkey");
@@ -138,14 +163,12 @@ int main(void) {
 	col2->bitPackingVecValue();
 	col3->bitPackingVecValue();*/
 
-	// init Table
-	vector<ColumnBase*> columns;
+	// add column to Table
 	columns.push_back(col0);
 	columns.push_back(col1);
 	columns.push_back(col2);
 	columns.push_back(col3);
-	Table* table = new Table(columns);
-	table->setName("orders");
+
 	// process columns of table
 	table->processColumn();
 
