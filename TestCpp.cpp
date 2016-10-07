@@ -16,6 +16,7 @@
 #include <tuple>
 #include <algorithm>
 #include <stdexcept>
+#include <map>
 #include <boost/algorithm/string.hpp>
 #include <boost/dynamic_bitset.hpp>
 
@@ -279,7 +280,7 @@ int main(void) {
 					ColumnBase::OP_TYPE q_where_op = q_where_ops[fidx];
 					string q_where_value = q_where_values[fidx];
 
-					// get column by name then cast to appropriate column based on column type
+					// get column by name then cast to appropriate column object based on type
 					ColumnBase* colBase = table->getColumnByName(q_where_field);
 					if (colBase == NULL) continue;
 					switch (colBase->getType()) {
@@ -295,6 +296,9 @@ int main(void) {
 							}
 							bool initQueryResult = (fidx == 0);
 							t->selection(searchValue, q_where_op, q_resultRid, initQueryResult);
+							// build hashmap
+							map<int, vector<size_t>*> hashmap;
+							t->buildHashmap(hashmap);
 							break;
 						}
 						case ColumnBase::charType:

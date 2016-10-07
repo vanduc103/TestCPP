@@ -11,9 +11,10 @@
 
 #include <math.h>
 #include <iostream>
-#include <boost/dynamic_bitset.hpp>
 #include <vector>
 #include <string>
+#include <map>
+#include <stdexcept>
 #include "ColumnBase.h"
 #include "Dictionary.h"
 #include "PackedArray.h"
@@ -25,21 +26,18 @@ class Column: public ColumnBase {
 private:
 	// value vector for column
 	vector<size_t>* vecValue;
-	// encoded value vector
-	vector<boost::dynamic_bitset<>>* encodedVecValue;
+	// bit packing
 	PackedArray* packed;
 	// dictionary vector for column
 	Dictionary<T>* dictionary;
 public:
 	Column() {
-		encodedVecValue = new vector<boost::dynamic_bitset<>>();
 		dictionary = new Dictionary<T>();
 		vecValue = new vector<size_t>();
 		packed = new PackedArray();
 	}
 	virtual ~Column() {
 		delete vecValue;
-		delete encodedVecValue;
 		delete dictionary;
 		PackedArray_destroy(packed);
 	}
@@ -89,30 +87,8 @@ public:
 	}
 
 	void updateVecValue(T& value) {
-		// used for column has few distinct values
+		// used for column has few duplicate values
 		vecValue->push_back(value);
-	}
-
-	void updateEncodedVecValue() {
-		// #bit to represent encode dictionary value
-		size_t numOfBit = (size_t) ceil(log2((double) dictionary->size()));
-		for (size_t i = 0; i < vecValue->size(); i++) {
-			encodedVecValue->push_back(
-					boost::dynamic_bitset<>(numOfBit, vecValue->at(i)));
-		}
-		// free vecValue
-		vecValue->resize(0);
-	}
-
-	vector<boost::dynamic_bitset<>>* getEncodedVecValue() {
-		return encodedVecValue;
-	}
-
-	void printEncodedVecValue(int row) {
-		for (size_t i = 0; i < (*encodedVecValue).size() && i < row; i++) {
-			cout << "encodedVecValue[" << i << "] = "
-					<< ((*encodedVecValue)[i]).to_ulong() << "\n";
-		}
 	}
 
 	Dictionary<T>* getDictionary() {
@@ -169,6 +145,35 @@ public:
 		}
 
 		return outputs;
+	}
+
+	// Loop to vecValue (at bit packed) to build hashmap of dictionary value and row id
+	void buildHashmap(map<T, vector<size_t>*>& hashmap) {
+		// unpack vecValue to build hash map
+		vecValue = getVecValue();
+		for (size_t rowId = 0; rowId < vecValue->size(); rowId++) {
+			size_t dictPosition = vecValue->at(rowId);
+			// lookup encodeValue on dictionary
+			T* dictVal = dictionary->lookup(dictPosition);
+			// add row id into hashmap of dictionary value
+			if (dictVal != NULL) {
+				if (hashmap[*dictVal] == NULL)
+					hashmap[*dictVal] = new vector<size_t>();
+				hashmap[*dictVal]->push_back(rowId);
+			}
+		}
+	}
+
+	// Return vector of matching row ids
+	vector<size_t>* probe(map<T, vector<size_t>*>* hashmap, T* probedValue) {
+		if (hashmap != NULL) {
+			try {
+				return hashmap->at(*probedValue);
+			} catch (exception& e) {
+				return NULL;
+			}
+		}
+		return NULL;
 	}
 };
 
