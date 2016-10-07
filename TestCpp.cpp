@@ -268,7 +268,7 @@ int main(void) {
 						cout << "where operators[" << i << "] = " << q_where_ops[i] << endl;
 					}
 					for (size_t i = 0; i < q_where_values.size(); i++) {
-						cout << "value values[" << i << "] = " << q_where_values[i] << endl;
+						cout << "where values[" << i << "] = " << q_where_values[i] << endl;
 					}
 				}
 				// execute query
@@ -286,7 +286,6 @@ int main(void) {
 						case ColumnBase::COLUMN_TYPE::intType:
 						{
 							Column<int>* t = (Column<int>*) colBase;
-							vector<size_t> result;
 							int searchValue = 0;
 							try {
 								searchValue = stoi(q_where_value);
@@ -294,62 +293,17 @@ int main(void) {
 								cerr << "Exception: " << e.what() << endl;
 								break;
 							}
-							t->getDictionary()->search(searchValue, q_where_op, result);
-
-							// find rowId with appropriate encodeValue
-							for (size_t rowId = 0; !result.empty() && rowId < t->vecValueSize(); rowId++) {
-								size_t encodeValue = t->vecValueAt(rowId);
-								if (encodeValue >= result.front() && encodeValue <= result.back()) {
-									// first where expr
-									if (fidx == 0)
-										q_resultRid->push_back(1); //rowId is in query result
-									else {
-										// only keep rid that existed on previous rid vector
-										if (q_resultRid->at(rowId)) {
-											// keep this row id in result - do nothing
-										}
-									}
-								}
-								else {
-									// rowId is not in query result
-									if(fidx == 0)
-										q_resultRid->push_back(0);
-									else
-										q_resultRid->at(rowId) = 0;
-								}
-							}
+							bool initQueryResult = (fidx == 0);
+							t->selection(searchValue, q_where_op, q_resultRid, initQueryResult);
 							break;
 						}
 						case ColumnBase::charType:
 						case ColumnBase::varcharType:
 						{
 							Column<string>* t = (Column<string>*) colBase;
-							vector<size_t> result;
 							string searchValue = q_where_value;
-							t->getDictionary()->search(searchValue, q_where_op, result);
-
-							// find rowId with appropriate encodeValue
-							for (size_t rowId = 0; !result.empty() && rowId < t->vecValueSize(); rowId++) {
-								size_t encodeValue = t->vecValueAt(rowId);
-								if (encodeValue >= result.front() && encodeValue <= result.back()) {
-									// first where expr
-									if (fidx == 0)
-										q_resultRid->push_back(1); //rowId is in query result
-									else {
-										// only keep rid that existed on previous rid vector
-										if (q_resultRid->at(rowId)) {
-											// keep this row id in result - do nothing
-										}
-									}
-								}
-								else {
-									// rowId is not in query result
-									if(fidx == 0)
-										q_resultRid->push_back(0);
-									else
-										q_resultRid->at(rowId) = 0;
-								}
-							}
+							bool initQueryResult = (fidx == 0);
+							t->selection(searchValue, q_where_op, q_resultRid, initQueryResult);
 							break;
 						}
 					}
@@ -369,29 +323,18 @@ int main(void) {
 					outputs[0] += select_field_name + ", ";
 					ColumnBase* colBase = (ColumnBase*) table->getColumnByName(select_field_name);
 					if (colBase == NULL) continue;
-					limitCount = 0;
 					if (colBase->getType() == ColumnBase::intType) {
 						Column<int>* t = (Column<int>*) colBase;
-						for (size_t rid = 0; rid < q_resultRid->size(); rid++) {
-							//size_t rid = i;
-							if (q_resultRid->at(rid)) {
-								size_t encodeValue = t->vecValueAt(rid);
-								int* a = t->getDictionary()->lookup(encodeValue);
-								outputs[limitCount+1] += to_string(*a) + ", ";
-								if (++limitCount >= limit) break;
-							}
+						vector<int> tmpOut = t->projection(q_resultRid, limit, limitCount);
+						for (size_t i = 0; i < tmpOut.size(); i++) {
+							outputs[i+1] += to_string(tmpOut[i]) + ",";
 						}
 					}
 					else {
 						Column<string>* t = (Column<string>*) colBase;
-						for (size_t rid = 0; rid < q_resultRid->size(); rid++) {
-							//size_t rid = i;
-							if (q_resultRid->at(rid)) {
-								size_t encodeValue = t->vecValueAt(rid);
-								string* a = t->getDictionary()->lookup(encodeValue);
-								outputs[limitCount+1] += "\"" + *a + "\", ";
-								if (++limitCount >= limit) break;
-							}
+						vector<string> tmpOut = t->projection(q_resultRid, limit, limitCount);
+						for (size_t i = 0; i < tmpOut.size(); i++) {
+							outputs[i+1] += "\"" + tmpOut[i] + "\"" + ",";
 						}
 					}
 				}
