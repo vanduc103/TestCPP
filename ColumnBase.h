@@ -14,12 +14,13 @@ namespace std {
 
 class ColumnBase {
 public:
-	enum COLUMN_TYPE {intType, charType, varcharType};
+	enum COLUMN_TYPE {intType, charType, varcharType, dateType};
 	enum OP_TYPE {equalOp, neOp, ltOp, leOp, gtOp, geOp, likeOp};
 private:
 	string name;
 	COLUMN_TYPE type;
 	int size;
+	bool isPrimaryKey = false; // default is false
 public:
 	ColumnBase();
 	virtual ~ColumnBase();
@@ -32,6 +33,9 @@ public:
 
 	int getSize();
 	void setSize(int sizeValue);
+
+	bool primaryKey();
+	void setPrimaryKey(bool isPrimaryKey);
 };
 
 } /* namespace std */

@@ -53,6 +53,7 @@ int main(void) {
 	col0->setName("o_orderkey");
 	col0->setType(ColumnBase::intType);
 	col0->setSize(4);
+	col0->setPrimaryKey(true);
 
 	// Column 1
 	Column<string>* col1 = new Column<string>();
@@ -80,11 +81,11 @@ int main(void) {
 	string filePath;
 	//getline(cin, filePath);
 	//ifstream infile(filePath);
-	ifstream infile("/home/duclv/Downloads/data1M.csv");
-	//ifstream infile("/home/duclv/homework/data1M.csv");
+	//ifstream infile("/home/duclv/Downloads/data1M.csv");
+	ifstream infile("/home/duclv/homework/data1M.csv");
 	string line;
 	string delim = ",";
-	//int row = 0;
+	int row = 0;
 	while(getline(infile, line)) {
 		size_t last = 0; size_t next = 0;
 		char i = 0;
@@ -92,23 +93,22 @@ int main(void) {
 		string token;
 		while ((next = line.find(delim, last)) != string::npos) {
 		    token = line.substr(last, next - last);
-		    //line.erase(0, pos + delim.length());
 		    last = next + delim.length();
 		    i++;
 		    // key is 1st column
 			if (i == 1) {
 				int key = stoi(token);
-				col0->updateDictionary(key, false);
+				col0->updateDictionary(key, !col0->primaryKey());
 			}
 		    // status is 2nd column
 			else if (i == 2) {
 				boost::replace_all(token, "\"", "");
-		    	col1->updateDictionary(token, false);
+		    	col1->updateDictionary(token, col1->getType() == ColumnBase::intType);
 		    }
 		    // totalprice is 3rd column
 		    else if (i == 3) {
 		    	int totalprice = stoi(token);
-		    	col2->updateDictionary(totalprice, true);
+		    	col2->updateDictionary(totalprice, col2->getType() == ColumnBase::intType);
 		    }
 		    // comment is from 4th column
 			if (i >= 4) comment += token + delim;
@@ -117,32 +117,36 @@ int main(void) {
 		token = line.substr(last);
 		comment += token;
 		boost::replace_all(comment, "\"", "");
-		col3->updateDictionary(comment, false);
+		col3->updateDictionary(comment, col3->getType() == ColumnBase::intType);
+		++row;
 	}
 	infile.close();
 	// print distinct numbers
-	cout << col0->getName() << " number of distinct values = " << col0->getDictionary()->size() << endl;
-	cout << col1->getName() << " number of distinct values = " << col1->getDictionary()->size() << endl;
-	cout << col2->getName() << " number of distinct values = " << col2->getDictionary()->size() << endl;
-	cout << col3->getName() << " number of distinct values = " << col3->getDictionary()->size() << endl;
+	cout << col0->getName() << " #distinct values = " << col0->getDictionary()->size()<<"/"<<row << endl;
+	cout << col1->getName() << " #distinct values = " << col1->getDictionary()->size()<<"/"<<row << endl;
+	cout << col2->getName() << " #distinct values = " << col2->getDictionary()->size()<<"/"<<row << endl;
+	cout << col3->getName() << " #distinct values = " << col3->getDictionary()->size()<<"/"<<row << endl;
 	// clear temporary memory
-	col0->getDictionary()->clearTemp();
+	/*col0->getDictionary()->clearTemp();
 	col1->getDictionary()->clearTemp();
 	col2->getDictionary()->clearTemp();
-	col3->getDictionary()->clearTemp();
+	col3->getDictionary()->clearTemp();*/
 	// bit packing
-	col0->bitPackingVecValue();
+	/*col0->bitPackingVecValue();
 	col1->bitPackingVecValue();
 	col2->bitPackingVecValue();
-	col3->bitPackingVecValue();
+	col3->bitPackingVecValue();*/
 
 	// init Table
 	vector<ColumnBase*> columns;
+	columns.push_back(col0);
 	columns.push_back(col1);
 	columns.push_back(col2);
 	columns.push_back(col3);
 	Table* table = new Table(columns);
 	table->setName("orders");
+	// process columns of table
+	table->processColumn();
 
 	// print result
 	//col1->printVecValue(10);
