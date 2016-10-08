@@ -42,7 +42,19 @@ std::ostream& operator<<(std::ostream& out, const ColumnBase::OP_TYPE value){
         PROCESS_VAL(ColumnBase::OP_TYPE::likeOp, "LIKE");
     }
 #undef PROCESS_VAL
+    return out << s;
+}
 
+// print column type
+std::ostream& operator<<(std::ostream& out, const ColumnBase::COLUMN_TYPE value){
+    const char* s = 0;
+#define PROCESS_VAL(p, str) case(p): s = str; break;
+    switch(value){
+        PROCESS_VAL(ColumnBase::intType, "INTEGER");
+        PROCESS_VAL(ColumnBase::charType, "TEXT");
+        PROCESS_VAL(ColumnBase::varcharType, "TEXT");
+    }
+#undef PROCESS_VAL
     return out << s;
 }
 
@@ -50,32 +62,66 @@ int main(void) {
 	puts("***** Simple Column-Store Database start ******");
 
 	string createQuery;
-	cout << "Create table statement: " << endl;
+	cout << "Enter create table statement: ";
 	getline(cin, createQuery);
 	hsql::SQLParserResult* pCreateQuery = hsql::SQLParser::parseSQLString(createQuery);
 	string tableName;
-	string createTableStmt;
+	vector<string> cColumnName;
+	vector<ColumnBase::COLUMN_TYPE> cColumnType;
 	if (pCreateQuery->isValid) {
 		hsql::SQLStatement* stmt = pCreateQuery->getStatement(0);
 		if (stmt->type() == hsql::StatementType::kStmtCreate) {
 			hsql::CreateStatement* createStmt = (hsql::CreateStatement*) stmt;
 			tableName = createStmt->tableName;
-			createTableStmt = createStmt->filePath;
+			vector<hsql::ColumnDefinition*>* cols = createStmt->columns;
+			for (hsql::ColumnDefinition* colDef : *cols) {
+				cColumnName.push_back(colDef->name);
+				switch (colDef->type) {
+					case hsql::ColumnDefinition::INT:
+					case hsql::ColumnDefinition::DOUBLE:
+						cColumnType.push_back(ColumnBase::intType);
+						break;
+					case hsql::ColumnDefinition::TEXT:
+						cColumnType.push_back(ColumnBase::charType);
+						break;
+				}
+			}
 		}
 	}
 	else {
 		cout << "Create table statement is Invalid !" << endl;
 		return -1;
 	}
-
+	cout << "tablename: " << tableName << endl;
 	// init table
 	vector<ColumnBase*> columns;
 	Table* table = new Table(columns);
 	table->setName(tableName);
-
+	// init column
+	for (size_t i = 0; i < cColumnName.size(); i++) {
+		string name = cColumnName[i];
+		ColumnBase::COLUMN_TYPE type = cColumnType[i];
+		cout << "colname: " << name << endl;
+		cout << "col type: " << type << endl;
+		// create new column
+		ColumnBase* colBase = new ColumnBase();
+		if (type == ColumnBase::intType) {
+			Column<int>* col = new Column<int>();
+			colBase = col;
+		}
+		else {
+			Column<string>* col = new Column<string>();
+			colBase = col;
+		}
+		colBase->setName(name);
+		colBase->setType(type);
+		if (i == 0)
+			colBase->setPrimaryKey(true);
+		columns.push_back(colBase);
+	}
 
 	// Column 0
-	Column<int>* col0 = new Column<int>();
+	/*Column<int>* col0 = new Column<int>();
 	col0->setName("o_orderkey");
 	col0->setType(ColumnBase::intType);
 	col0->setSize(4);
@@ -97,7 +143,7 @@ int main(void) {
 	Column<string>* col3 = new Column<string>();
 	col3->setName("o_comment");
 	col3->setType(ColumnBase::charType);
-	col3->setSize(30);
+	col3->setSize(30);*/
 
 	// calculate time execution
 	clock_t begin_time = clock();
@@ -107,20 +153,27 @@ int main(void) {
 	string filePath;
 	//getline(cin, filePath);
 	//ifstream infile(filePath);
-	//ifstream infile("/home/duclv/Downloads/data1M.csv");
-	ifstream infile("/home/duclv/homework/data1M.csv");
+	ifstream infile("/home/duclv/Downloads/data1M.csv");
+	//ifstream infile("/home/duclv/homework/data1M.csv");
 	string line;
 	string delim = ",";
 	int row = 0;
 	while(getline(infile, line)) {
 		size_t last = 0; size_t next = 0;
-		char i = 0;
-		string comment;
+		char idx = 0;
+		vector<string> items;	// split items
+		string lastItem;
 		string token;
 		while ((next = line.find(delim, last)) != string::npos) {
 		    token = line.substr(last, next - last);
 		    last = next + delim.length();
-		    i++;
+		    if (idx >= table->numOfColumns() - 1)
+		    	lastItem += token + delim;
+		    else
+		    	items.push_back(token);
+		    ++idx;
+
+		    /*i++;
 		    // key is 1st column
 			if (i == 1) {
 				int key = stoi(token);
@@ -137,37 +190,54 @@ int main(void) {
 		    	col2->updateDictionary(totalprice, col2->getType() == ColumnBase::intType);
 		    }
 		    // comment is from 4th column
-			if (i >= 4) comment += token + delim;
+			if (i >= 4) comment += token + delim;*/
 		}
-		// get the last token and add to comment
+		// get the last token and add to last item
 		token = line.substr(last);
-		comment += token;
-		boost::replace_all(comment, "\"", "");
-		col3->updateDictionary(comment, col3->getType() == ColumnBase::intType);
+		lastItem += token;
+		items.push_back(lastItem);
+		/*boost::replace_all(comment, "\"", "");
+		col3->updateDictionary(comment, col3->getType() == ColumnBase::intType);*/
+
+		// process input data based on column type
+		for (int i = 0; i < table->numOfColumns(); i++) {
+			string item = items[i];
+			ColumnBase* colBase = columns[i];
+			if (colBase->getType() == ColumnBase::intType) {
+				int intValue = stoi(item);
+				bool sorted = colBase->primaryKey();
+				// update dictionary
+				Column<int>* col = (Column<int>*) colBase;
+				col->updateDictionary(intValue, sorted);
+			}
+			else {
+				// char or varchar type
+				boost::replace_all(item, "\"", "");
+				bool sorted = false;
+				// update dictionary
+				Column<string>* col = (Column<string>*) colBase;
+				col->updateDictionary(item, sorted);
+			}
+		}
 		++row;
 	}
 	infile.close();
 	// print distinct numbers
-	cout << col0->getName() << " #distinct values = " << col0->getDictionary()->size()<<"/"<<row << endl;
+	for (ColumnBase* colBase : columns) {
+		if (colBase->getType() == ColumnBase::intType) {
+			Column<int>* col = (Column<int>*) colBase;
+			cout << col->getName() << " #distinct values = " << col->getDictionary()->size()<<"/"<<row << endl;
+		}
+		else {
+			Column<string>* col = (Column<string>*) colBase;
+			cout << col->getName() << " #distinct values = " << col->getDictionary()->size()<<"/"<<row << endl;
+		}
+	}
+	/*cout << col0->getName() << " #distinct values = " << col0->getDictionary()->size()<<"/"<<row << endl;
 	cout << col1->getName() << " #distinct values = " << col1->getDictionary()->size()<<"/"<<row << endl;
 	cout << col2->getName() << " #distinct values = " << col2->getDictionary()->size()<<"/"<<row << endl;
-	cout << col3->getName() << " #distinct values = " << col3->getDictionary()->size()<<"/"<<row << endl;
-	// clear temporary memory
-	/*col0->getDictionary()->clearTemp();
-	col1->getDictionary()->clearTemp();
-	col2->getDictionary()->clearTemp();
-	col3->getDictionary()->clearTemp();*/
-	// bit packing
-	/*col0->bitPackingVecValue();
-	col1->bitPackingVecValue();
-	col2->bitPackingVecValue();
-	col3->bitPackingVecValue();*/
+	cout << col3->getName() << " #distinct values = " << col3->getDictionary()->size()<<"/"<<row << endl;*/
 
-	// add column to Table
-	columns.push_back(col0);
-	columns.push_back(col1);
-	columns.push_back(col2);
-	columns.push_back(col3);
 
 	// process columns of table
 	table->processColumn();
@@ -175,7 +245,7 @@ int main(void) {
 	// print result
 	//col1->printVecValue(10);
 	//col2->printVecValue(10);
-	//col3->getDictionary()->print(20);
+	//((Column<string>*)columns[1])->getDictionary()->print(10);
 
 	// loaded time
 	cout << "Table Load time: " << float( clock () - begin_time ) /  CLOCKS_PER_SEC << " seconds " << endl;
@@ -354,14 +424,14 @@ int main(void) {
 						Column<int>* t = (Column<int>*) colBase;
 						vector<int> tmpOut = t->projection(q_resultRid, limit, limitCount);
 						for (size_t i = 0; i < tmpOut.size(); i++) {
-							outputs[i+1] += to_string(tmpOut[i]) + ",";
+							outputs[i+1] += to_string(tmpOut[i]) + ",   ";
 						}
 					}
 					else {
 						Column<string>* t = (Column<string>*) colBase;
 						vector<string> tmpOut = t->projection(q_resultRid, limit, limitCount);
 						for (size_t i = 0; i < tmpOut.size(); i++) {
-							outputs[i+1] += "\"" + tmpOut[i] + "\"" + ",";
+							outputs[i+1] += "\"" + tmpOut[i] + "\"" + ",   ";
 						}
 					}
 				}

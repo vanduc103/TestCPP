@@ -37,6 +37,10 @@ public:
 		name = tableName;
 	}
 
+	int numOfColumns() {
+		return (int) m_columns->size();
+	}
+
 	ColumnBase* getColumnByName(string colName) {
 		//int tupleSize = tuple_size<decltype(m_columns)>::value;;
 		for (size_t i = 0; i < m_columns->size(); i++) {
