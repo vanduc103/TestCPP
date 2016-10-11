@@ -61,9 +61,9 @@ std::ostream& operator<<(std::ostream& out, const ColumnBase::COLUMN_TYPE value)
 int main(void) {
 	puts("***** Simple Column-Store Database start ******");
 
-	string createQuery;
-	cout << "Enter create table statement: ";
-	getline(cin, createQuery);
+	string createQuery = "create table orders (o_orderkey integer, o_orderstatus text, o_totalprice integer, o_comment text)";
+	//cout << "Enter create table statement: ";
+	//getline(cin, createQuery);
 	hsql::SQLParserResult* pCreateQuery = hsql::SQLParser::parseSQLString(createQuery);
 	string tableName;
 	vector<string> cColumnName;
@@ -153,8 +153,7 @@ int main(void) {
 	string filePath;
 	//getline(cin, filePath);
 	//ifstream infile(filePath);
-	ifstream infile("/home/duclv/Downloads/data1M.csv");
-	//ifstream infile("/home/duclv/homework/data1M.csv");
+	ifstream infile("/home/duclv/homework/data1M.csv");
 	string line;
 	string delim = ",";
 	int row = 0;
@@ -238,7 +237,6 @@ int main(void) {
 	cout << col2->getName() << " #distinct values = " << col2->getDictionary()->size()<<"/"<<row << endl;
 	cout << col3->getName() << " #distinct values = " << col3->getDictionary()->size()<<"/"<<row << endl;*/
 
-
 	// process columns of table
 	table->processColumn();
 
@@ -250,6 +248,83 @@ int main(void) {
 	// loaded time
 	cout << "Table Load time: " << float( clock () - begin_time ) /  CLOCKS_PER_SEC << " seconds " << endl;
 
+	/*
+	 * Load table 2: lineitem
+	 */
+	begin_time = clock();
+	// init table 2
+	vector<ColumnBase*> columns2;
+	Table* table2 = new Table(columns2);
+	table->setName("lineitem");
+
+	// Column 0
+	Column<int>* col0 = new Column<int>();
+	col0->setName("l_orderkey");
+	col0->setType(ColumnBase::intType);
+	col0->setSize(4);
+
+	// Column 1
+	Column<int>* col1 = new Column<int>();
+	col1->setName("l_quantity");
+	col1->setType(ColumnBase::intType);
+	col1->setSize(4);
+
+	// Column 2
+	Column<string>* col2 = new Column<string>();
+	col2->setName("l_returnflag");
+	col2->setType(ColumnBase::charType);
+	col2->setSize(1);
+
+	// read data into column
+	filePath = "/home/duclv/homework/lineitem1M.tbl";
+	ifstream infile2(filePath);
+	if (!infile2) {
+		cout << "Cannot open file path: " << filePath << endl;
+		return -1;
+	}
+	// process file
+	row = 0;
+	delim = "|";
+	while(getline(infile2, line)) {
+		size_t last = 0; size_t next = 0;
+		char i = 0;
+		string token;
+		// read each token and add into column store
+		while ((next = line.find(delim, last)) != string::npos) {
+			token = line.substr(last, next - last);
+			last = next + delim.length();
+			i++;
+			// orderkey is 1st column
+			if (i == 1) {
+				int orderkey = stoi(token);
+				col0->updateDictionary(orderkey, false);
+			}
+			// quantity is 2nd column
+			else if (i == 2) {
+				int quantity = stoi(token);
+				col1->updateDictionary(quantity, true);
+			}
+		}
+		// get the last token
+		token = line.substr(last);
+		boost::replace_all(token, "\"", "");
+		col2->updateDictionary(token, false);
+		++row;
+	}
+	infile.close();
+	cout << "Table 2 Load time: " << float( clock () - begin_time ) /  CLOCKS_PER_SEC << " seconds " << endl;
+
+	// print distinct values
+	cout << col0->getName() << " #distinct values = " << col0->getDictionary()->size()<<"/"<<row << endl;
+	cout << col1->getName() << " #distinct values = " << col1->getDictionary()->size()<<"/"<<row << endl;
+	cout << col2->getName() << " #distinct values = " << col2->getDictionary()->size()<<"/"<<row << endl;
+
+	// add columns to table
+	columns2.push_back(col0);
+	columns2.push_back(col1);
+	columns2.push_back(col2);
+	table2->processColumn();
+
 	// query
 	while (true) {
 		string query = "Select * from orders where o_totalprice < 56789 and o_totalprice > 5678";
@@ -257,6 +332,41 @@ int main(void) {
 		getline(cin, query);
 		if ("quit" == query)
 			break;
+
+		// Join test
+		if ("join" == query) {
+			begin_time = clock();
+			// join l_orderkey with o_orderkey
+			Column<int>* l_orderkey = col0;
+			Column<int>* o_orderkey = (Column<int>*) table->getColumnByName("o_orderkey");
+			if (l_orderkey->getSize() >= o_orderkey->getSize()) {
+				// create mapping between vecValue of 2 join columns
+				vector<tuple<size_t, size_t>> mappingValueId;
+				for (size_t i = 0; i < l_orderkey->getSize(); i++) {
+					size_t valueId1 = l_orderkey->vecValueAt(i);
+					int* dictValue1 = l_orderkey->getDictionary()->lookup(valueId1);
+					if (dictValue1 != NULL) {
+						// search dictionary value on 2nd column
+						vector<size_t> result;
+						o_orderkey->getDictionary()->search(*dictValue1, ColumnBase::equalOp, result);
+						size_t valueId2 = result[0];
+						if (valueId2 != -1)
+							mappingValueId.push_back(make_tuple(valueId1, valueId2));
+					}
+				}
+				// build hashmap for smaller column
+				map<int, vector<size_t>*> hashmap;
+				o_orderkey->buildHashmap(hashmap);
+				// probe to find matching row id
+				vector<size_t> l_rowIds;
+				vector<size_t> o_rowIds;
+				for (size_t rowId = 0; rowId < l_orderkey->getSize(); rowId++) {
+					size_t valueId1 = l_orderkey->vecValueAt(rowId);
+
+				}
+			}
+
+		}
 
 		begin_time = clock();
 		// parse a given query
@@ -281,10 +391,13 @@ int main(void) {
 
 				for (hsql::Expr* expr : *select->selectList) {
 					if (expr->type == hsql::ExprType::kExprStar) {
-						q_select_fields.push_back("o_orderkey");
+						for (ColumnBase* colBase : (*table->columns())) {
+							q_select_fields.push_back(colBase->getName());
+						}
+						/*q_select_fields.push_back("o_orderkey");
 						q_select_fields.push_back("o_orderstatus");
 						q_select_fields.push_back("o_totalprice");
-						q_select_fields.push_back("o_comment");
+						q_select_fields.push_back("o_comment");*/
 					}
 					else if (expr->type == hsql::ExprType::kExprColumnRef)
 						q_select_fields.push_back(expr->name);

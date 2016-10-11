@@ -147,20 +147,15 @@ public:
 		return outputs;
 	}
 
-	// Loop to vecValue (at bit packed) to build hashmap of dictionary value and row id
+	// Loop to vecValue (at bit packed) to build hashmap of valueId
 	void buildHashmap(map<T, vector<size_t>*>& hashmap) {
 		// unpack vecValue to build hash map
 		vecValue = getVecValue();
 		for (size_t rowId = 0; rowId < vecValue->size(); rowId++) {
-			size_t dictPosition = vecValue->at(rowId);
-			// lookup encodeValue on dictionary
-			T* dictVal = dictionary->lookup(dictPosition);
-			// add row id into hashmap of dictionary value
-			if (dictVal != NULL) {
-				if (hashmap[*dictVal] == NULL)
-					hashmap[*dictVal] = new vector<size_t>();
-				hashmap[*dictVal]->push_back(rowId);
-			}
+			size_t valueId = vecValue->at(rowId);
+			if (hashmap[valueId] == NULL)
+				hashmap[valueId] = new vector<size_t>();
+			hashmap[valueId]->push_back(rowId);
 		}
 	}
 

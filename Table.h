@@ -30,6 +30,10 @@ public:
 		m_columns = &columns;
 	}
 
+	vector<ColumnBase*>* columns() {
+		return m_columns;
+	}
+
 	string getName() {
 		return name;
 	}
