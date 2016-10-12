@@ -160,6 +160,8 @@ size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue, bool sor
 		typename vector<T>::iterator lower;
 		lower = std::lower_bound(items->begin(), items->end(), value,
 				compFunc<T>);
+		if (bulkInsert)
+			bulkVecValue->push_back(value);
 		// value existed
 		if (lower != items->end() && equalFunc(value, *lower)) {
 			// return the position of lower
@@ -173,8 +175,6 @@ size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue, bool sor
 				// insert to the end of dictionary
 				newElementPos = items->size();
 				items->push_back(value);
-				if (bulkInsert)
-					bulkVecValue->push_back(value);
 				vecValue->push_back(newElementPos);
 			} else {
 				newElementPos = lower - items->begin();
@@ -187,9 +187,6 @@ size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue, bool sor
 							++vecValue->at(i);
 						}
 					}
-				}
-				else {
-					bulkVecValue->push_back(value);
 				}
 				vecValue->push_back(newElementPos);
 			}

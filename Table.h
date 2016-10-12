@@ -60,12 +60,17 @@ public:
 		for (ColumnBase* colBase : *m_columns) {
 			if (colBase->getType() == ColumnBase::intType) {
 				Column<int>* col = (Column<int>*) colBase;
+				if (col->isBulkInsert())
+					col->bulkBuildVecVector();
 				col->getDictionary()->clearTemp();
 				col->bitPackingVecValue();
 			}
 			else if (colBase->getType() == ColumnBase::charType ||
 					 colBase->getType() == ColumnBase::varcharType) {
 				Column<string>* col = (Column<string>*) colBase;
+				if (col->isBulkInsert()) {
+					col->bulkBuildVecVector();
+				}
 				col->getDictionary()->clearTemp();
 				col->bitPackingVecValue();
 			}

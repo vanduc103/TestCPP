@@ -204,7 +204,7 @@ int main(void) {
 			ColumnBase* colBase = columns[i];
 			if (colBase->getType() == ColumnBase::intType) {
 				int intValue = stoi(item);
-				bool sorted = false; //!(colBase->primaryKey());
+				bool sorted = true; //!(colBase->primaryKey());
 				// update dictionary
 				Column<int>* col = (Column<int>*) colBase;
 				col->updateDictionary(intValue, sorted);
@@ -255,7 +255,7 @@ int main(void) {
 	// init table 2
 	vector<ColumnBase*> columns2;
 	Table* table2 = new Table(columns2);
-	table->setName("lineitem");
+	table2->setName("lineitem");
 
 	// Column 0
 	Column<int>* col0 = new Column<int>();
@@ -312,7 +312,6 @@ int main(void) {
 		++row;
 	}
 	infile.close();
-	cout << "Table 2 Load time: " << float( clock () - begin_time ) /  CLOCKS_PER_SEC << " seconds " << endl;
 
 	// print distinct values
 	cout << col0->getName() << " #distinct values = " << col0->getDictionary()->size()<<"/"<<row << endl;
@@ -324,6 +323,8 @@ int main(void) {
 	columns2.push_back(col1);
 	columns2.push_back(col2);
 	table2->processColumn();
+
+	cout << "Table 2 Load time: " << float( clock () - begin_time ) /  CLOCKS_PER_SEC << " seconds " << endl;
 
 	// query
 	while (true) {

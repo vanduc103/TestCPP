@@ -30,6 +30,8 @@ private:
 	PackedArray* packed;
 	// dictionary vector for column
 	Dictionary<T>* dictionary;
+	// bulk insert ?
+	bool bulkInsert = false;
 public:
 	Column() {
 		dictionary = new Dictionary<T>();
@@ -102,19 +104,26 @@ public:
 	void updateDictionary(T& value, bool sorted = true, bool bulkInsert = true) {
 		// no bulk insert if no sort
 		if (!sorted) bulkInsert = false;
+		this->bulkInsert = bulkInsert;
+
 		dictionary->addNewElement(value, vecValue, sorted, bulkInsert);
-		// bulk insert -> update vecValue after inserting into dictionary
-		if (bulkInsert) {
-			vector<T>* bulkVecValue = dictionary->getBulkVecValue();
-			if (bulkVecValue != NULL) {
-				for (size_t i = 0; i < bulkVecValue->size(); i++) {
-					// find position of valueId in dictionary
-					vector<size_t> result;
-					dictionary->search(bulkVecValue->at(i), ColumnBase::equalOp, result);
-					size_t pos = result[0];
-					if (pos != -1)
-						vecValue->at(i) = pos;
-				}
+	}
+
+	bool isBulkInsert() {
+		return bulkInsert;
+	}
+	void bulkBuildVecVector() {
+		// bulk insert -> update vecValue after building entire dictionary
+		vecValue->resize(0);
+		vector<T>* bulkVecValue = dictionary->getBulkVecValue();
+		if (bulkVecValue != NULL) {
+			for (size_t i = 0; i < bulkVecValue->size(); i++) {
+				// find position of valueId in dictionary
+				vector<size_t> result;
+				dictionary->search(bulkVecValue->at(i), ColumnBase::equalOp, result);
+				size_t pos = result[0];
+				if (pos != -1)
+					vecValue->push_back(pos);
 			}
 		}
 	}
