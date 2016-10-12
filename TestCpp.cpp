@@ -115,8 +115,8 @@ int main(void) {
 		}
 		colBase->setName(name);
 		colBase->setType(type);
-		if (i == 0)
-			colBase->setPrimaryKey(true);
+		/*if (i == 0)
+			colBase->setPrimaryKey(true);*/
 		columns.push_back(colBase);
 	}
 
@@ -153,7 +153,7 @@ int main(void) {
 	string filePath;
 	//getline(cin, filePath);
 	//ifstream infile(filePath);
-	ifstream infile("/home/duclv/homework/data1M.csv");
+	ifstream infile("/home/duclv/homework/data.csv");
 	string line;
 	string delim = ",";
 	int row = 0;
@@ -204,7 +204,7 @@ int main(void) {
 			ColumnBase* colBase = columns[i];
 			if (colBase->getType() == ColumnBase::intType) {
 				int intValue = stoi(item);
-				bool sorted = colBase->primaryKey();
+				bool sorted = false; //!(colBase->primaryKey());
 				// update dictionary
 				Column<int>* col = (Column<int>*) colBase;
 				col->updateDictionary(intValue, sorted);
@@ -276,7 +276,7 @@ int main(void) {
 	col2->setSize(1);
 
 	// read data into column
-	filePath = "/home/duclv/homework/lineitem1M.tbl";
+	filePath = "/home/duclv/homework/lineitem.tbl";
 	ifstream infile2(filePath);
 	if (!infile2) {
 		cout << "Cannot open file path: " << filePath << endl;
@@ -297,7 +297,7 @@ int main(void) {
 			// orderkey is 1st column
 			if (i == 1) {
 				int orderkey = stoi(token);
-				col0->updateDictionary(orderkey, false);
+				col0->updateDictionary(orderkey, true);
 			}
 			// quantity is 2nd column
 			else if (i == 2) {
@@ -337,35 +337,117 @@ int main(void) {
 		if ("join" == query) {
 			begin_time = clock();
 			// join l_orderkey with o_orderkey
-			Column<int>* l_orderkey = col0;
+			Column<int>* l_orderkey = (Column<int>*) table2->getColumnByName("l_orderkey");
 			Column<int>* o_orderkey = (Column<int>*) table->getColumnByName("o_orderkey");
+			// initialize matching row ids
+			vector<bool> l_rowIds;
+			for (size_t i = 0; i < l_orderkey->vecValueSize(); i++) {
+				l_rowIds.push_back(0);
+			}
+			vector<bool> o_rowIds;
+			for (size_t i = 0;i < o_orderkey->vecValueSize(); i++) {
+				o_rowIds.push_back(0);
+			}
+			// process hash and probe
 			if (l_orderkey->getSize() >= o_orderkey->getSize()) {
 				// create mapping between vecValue of 2 join columns
-				vector<tuple<size_t, size_t>> mappingValueId;
-				for (size_t i = 0; i < l_orderkey->getSize(); i++) {
-					size_t valueId1 = l_orderkey->vecValueAt(i);
+				map<size_t, size_t> mappingValueId;
+				for (size_t i = 0; i < l_orderkey->getDictionary()->size(); i++) {
+					size_t valueId1 = i;
 					int* dictValue1 = l_orderkey->getDictionary()->lookup(valueId1);
 					if (dictValue1 != NULL) {
 						// search dictionary value on 2nd column
 						vector<size_t> result;
 						o_orderkey->getDictionary()->search(*dictValue1, ColumnBase::equalOp, result);
+						// if not existed valueId2 then return -1
 						size_t valueId2 = result[0];
-						if (valueId2 != -1)
-							mappingValueId.push_back(make_tuple(valueId1, valueId2));
+						mappingValueId[valueId1] = valueId2;
 					}
 				}
-				// build hashmap for smaller column
-				map<int, vector<size_t>*> hashmap;
-				o_orderkey->buildHashmap(hashmap);
-				// probe to find matching row id
-				vector<size_t> l_rowIds;
-				vector<size_t> o_rowIds;
-				for (size_t rowId = 0; rowId < l_orderkey->getSize(); rowId++) {
-					size_t valueId1 = l_orderkey->vecValueAt(rowId);
 
+				// build hashmap for smaller column
+				map<size_t, vector<size_t>*> hashmap;
+				o_orderkey->buildHashmap(hashmap);
+
+				// probe (join) to find matching row ids
+				for (size_t rowId = 0; rowId < l_orderkey->vecValueSize(); rowId++) {
+					size_t valueId1 = l_orderkey->vecValueAt(rowId);
+					// get valueId2 from mapping
+					size_t valueId2 = mappingValueId[valueId1];
+					// found on hashmap
+					vector<size_t>* rowIds = hashmap[valueId2];
+					if (rowIds != NULL) {
+						// keep row id
+						l_rowIds[rowId] = 1;
+						for (size_t o_rowId : *rowIds)
+							o_rowIds[o_rowId] = 1;
+					}
 				}
 			}
+			else {
+				// create mapping between vecValue of 2 join columns
+				map<size_t, size_t> mappingValueId;
+				for (size_t i = 0; i < o_orderkey->getDictionary()->size(); i++) {
+					size_t valueId1 = i;
+					int* dictValue1 = o_orderkey->getDictionary()->lookup(valueId1);
+					if (dictValue1 != NULL) {
+						// search dictionary value on 2nd column
+						vector<size_t> result;
+						l_orderkey->getDictionary()->search(*dictValue1, ColumnBase::equalOp, result);
+						// if not existed valueId2 then return -1
+						size_t valueId2 = result[0];
+						mappingValueId[valueId1] = valueId2;
+					}
+				}
 
+				// build hashmap for smaller column
+				map<size_t, vector<size_t>*> hashmap;
+				l_orderkey->buildHashmap(hashmap);
+
+				// probe (join) to find matching row ids
+				for (size_t rowId = 0; rowId < o_orderkey->vecValueSize(); rowId++) {
+					size_t valueId1 = o_orderkey->vecValueAt(rowId);
+					// get valueId2 from mapping
+					size_t valueId2 = mappingValueId[valueId1];
+					// found on hashmap
+					vector<size_t>* rowIds = hashmap[valueId2];
+					if (rowIds != NULL) {
+						// keep row id
+						o_rowIds[rowId] = 1;
+						for (size_t l_rowId : *rowIds)
+							l_rowIds[l_rowId] = 1;
+					}
+				}
+			}
+			// print the result based on matching row ids
+			cout << "********* Print join result ************" << endl;
+			size_t l_totalresult = 0;
+			for (size_t i = 0; i < l_rowIds.size(); i++) {
+				if (l_rowIds[i])
+					++l_totalresult;
+			}
+			size_t o_totalresult = 0;
+			for (size_t i = 0; i < o_rowIds.size(); i++) {
+				if (o_rowIds[i])
+					++o_totalresult;
+			}
+			size_t limit = 20;
+			size_t limitCount = 0;
+			cout << "orders result:" << endl;
+			vector<int> o_output = o_orderkey->projection(&o_rowIds, limit, limitCount);
+			for (auto o : o_output) {
+				cout << o << endl;
+			}
+			cout << "Print " << limit << "/" << o_totalresult << " results !" << endl;
+			//
+			cout << "lineitem result:" << endl;
+			vector<int> l_output = l_orderkey->projection(&l_rowIds, limit, limitCount);
+			for (auto l : l_output) {
+				cout << l << endl;
+			}
+			cout << "Print " << limit << "/" << l_totalresult << " results !" << endl;
+			std::cout << "Join query time: " << float(clock() - begin_time)/CLOCKS_PER_SEC << " seconds " << endl;
+			continue;
 		}
 
 		begin_time = clock();
@@ -502,9 +584,6 @@ int main(void) {
 							}
 							bool initQueryResult = (fidx == 0);
 							t->selection(searchValue, q_where_op, q_resultRid, initQueryResult);
-							// build hashmap
-							map<int, vector<size_t>*> hashmap;
-							t->buildHashmap(hashmap);
 							break;
 						}
 						case ColumnBase::charType:

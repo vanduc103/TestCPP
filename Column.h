@@ -99,8 +99,24 @@ public:
 	}
 
 	// Update new value for dictionary
-	void updateDictionary(T& value, bool sorted = true) {
-		dictionary->addNewElement(value, vecValue, sorted);
+	void updateDictionary(T& value, bool sorted = true, bool bulkInsert = true) {
+		// no bulk insert if no sort
+		if (!sorted) bulkInsert = false;
+		dictionary->addNewElement(value, vecValue, sorted, bulkInsert);
+		// bulk insert -> update vecValue after inserting into dictionary
+		if (bulkInsert) {
+			vector<T>* bulkVecValue = dictionary->getBulkVecValue();
+			if (bulkVecValue != NULL) {
+				for (size_t i = 0; i < bulkVecValue->size(); i++) {
+					// find position of valueId in dictionary
+					vector<size_t> result;
+					dictionary->search(bulkVecValue->at(i), ColumnBase::equalOp, result);
+					size_t pos = result[0];
+					if (pos != -1)
+						vecValue->at(i) = pos;
+				}
+			}
+		}
 	}
 
 	bool selection(T& searchValue, ColumnBase::OP_TYPE q_where_op,
@@ -147,8 +163,8 @@ public:
 		return outputs;
 	}
 
-	// Loop to vecValue (at bit packed) to build hashmap of valueId
-	void buildHashmap(map<T, vector<size_t>*>& hashmap) {
+	// Loop through vecValue (at bit packed) to build hashmap of valueId
+	void buildHashmap(map<size_t, vector<size_t>*>& hashmap) {
 		// unpack vecValue to build hash map
 		vecValue = getVecValue();
 		for (size_t rowId = 0; rowId < vecValue->size(); rowId++) {
@@ -160,10 +176,10 @@ public:
 	}
 
 	// Return vector of matching row ids
-	vector<size_t>* probe(map<T, vector<size_t>*>* hashmap, T* probedValue) {
+	vector<size_t>* probe(map<size_t, vector<size_t>*>* hashmap, size_t probedValue) {
 		if (hashmap != NULL) {
 			try {
-				return hashmap->at(*probedValue);
+				return hashmap->at(probedValue);
 			} catch (exception& e) {
 				return NULL;
 			}

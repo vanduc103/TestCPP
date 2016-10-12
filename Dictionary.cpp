@@ -30,6 +30,7 @@ template<class T>
 Dictionary<T>::Dictionary() {
 	items = new vector<T>();
 	sMap = new map<T, size_t, classcomp>();
+	bulkVecValue = new vector<T>();
 }
 
 template<class T>
@@ -135,9 +136,11 @@ void Dictionary<T>::search(T& value, ColumnBase::OP_TYPE opType, vector<size_t>&
 }
 
 template<class T>
-size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue, bool sorted) {
+size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue, bool sorted, bool bulkInsert) {
 	if (items->empty()) {
 		items->push_back(value);
+		if (bulkInsert)
+			bulkVecValue->push_back(value);
 		vecValue->push_back(0);
 		(*sMap)[value] = 1;
 		return 0;
@@ -170,16 +173,23 @@ size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue, bool sor
 				// insert to the end of dictionary
 				newElementPos = items->size();
 				items->push_back(value);
+				if (bulkInsert)
+					bulkVecValue->push_back(value);
 				vecValue->push_back(newElementPos);
 			} else {
 				newElementPos = lower - items->begin();
 				// insert into dictionary
 				items->insert(lower, value);
 				// update (+1) to all elements in vecValue have value >= newElementPos
-				for (int i = 0; i < vecValue->size(); i++) {
-					if (vecValue->at(i) >= newElementPos) {
-						++vecValue->at(i);
+				if (!bulkInsert) {
+					for (int i = 0; i < vecValue->size(); i++) {
+						if (vecValue->at(i) >= newElementPos) {
+							++vecValue->at(i);
+						}
 					}
+				}
+				else {
+					bulkVecValue->push_back(value);
 				}
 				vecValue->push_back(newElementPos);
 			}

@@ -24,17 +24,24 @@ private:
 
 	vector<T>* items;
 	std::map<T, size_t, classcomp>* sMap;
+	vector<T>* bulkVecValue;
 public:
 	Dictionary();
 	virtual ~Dictionary();
 
 	T* lookup(size_t index);
 	void search(T& value, ColumnBase::OP_TYPE opType, vector<size_t>& result);
-	size_t addNewElement(T& value, vector<size_t>* vecValue, bool sorted);
+	size_t addNewElement(T& value, vector<size_t>* vecValue, bool sorted, bool bulkInsert);
 	size_t size();
 	void print(int row);
+
+	vector<T>* getBulkVecValue() {
+		return bulkVecValue;
+	}
+
 	void clearTemp() {
 		sMap->clear();
+		bulkVecValue->clear();
 	}
 };
 
