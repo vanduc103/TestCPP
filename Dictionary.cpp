@@ -11,7 +11,10 @@
 #include <stdlib.h>
 #include <string>
 #include <iostream>
+#include <sstream>
+#include <iterator>
 #include <map>
+#include <unordered_map>
 #include "Dictionary.h"
 
 using namespace std;
@@ -26,12 +29,9 @@ bool equalFunc(T value1, T value2) {
 	return value1 == value2;
 };
 
-template<class T>
-Dictionary<T>::Dictionary() {
-	items = new vector<T>();
-	sMap = new map<T, size_t, classcomp>();
-	bulkVecValue = new vector<T>();
-}
+bool equalFunc(string value1, int value2) {
+	return false;
+};
 
 template<class T>
 T* Dictionary<T>::lookup(size_t index) {
@@ -129,11 +129,21 @@ void Dictionary<T>::search(T& value, ColumnBase::OP_TYPE opType, vector<size_t>&
 			break;
 		}
 		case ColumnBase::likeOp: {
+			// search by inverted index
+			for (size_t i = 0; i < vecInvertedIndex->size(); i++) {
+				invertedIndex idx = vecInvertedIndex->at(i);
+				if (equalFunc(idx.word, value)) {
+					result.insert(result.end(), idx.location.begin(), idx.location.end());
+					// sort result
+					sort(result.begin(), result.end());
+				}
+			}
 			break;
 		}
 		}
 	}
 }
+
 
 template<class T>
 size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue, bool sorted, bool bulkInsert) {
@@ -197,6 +207,43 @@ size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue, bool sor
 	}
 }
 
+template<class T>
+void Dictionary<T>::buildInvertedIndex() {
+	// make an unordered_map of words from all items
+	vector<string>* strItems = (vector<string>*) items;
+	unordered_map<string, vector<size_t>> mapWords;
+	for (size_t i = 0; i < strItems->size(); i++) {
+		// split item into word by whitespace
+		vector<string> words;
+		istringstream iss(strItems->at(i));
+		copy(istream_iterator<string>(iss), istream_iterator<string>(), back_inserter(words));
+		// add to map
+		for (size_t j = 0; j < words.size(); j++) {
+			// map key = word + position in text
+			string key = words[j] + "#" + to_string(j);
+			vector<size_t> location = mapWords[key];
+			location.push_back(i); // text position
+			mapWords[key] = location;
+		}
+	}
+	// create vector of inverted index from map
+	for (const auto& m : mapWords) {
+		string key = m.first;
+		vector<size_t> location = m.second;
+		size_t findPos = key.find('#');
+		string word = key.substr(0, findPos);
+		char position = stoi(key.substr(findPos + 1));
+		//
+		invertedIndex idx;
+		idx.word = word;
+		idx.position = position;
+		idx.location = location;
+		vecInvertedIndex->push_back(idx);
+	}
+	//for (size_t i = 0; i < vecInvertedIndex->size(); i++)
+	//cout << "Phan tu " << i << " = " << (vecInvertedIndex->at(i)).word << "," << to_string((vecInvertedIndex->at(i)).position) << endl;
+}
+
 
 template<class T>
 size_t Dictionary<T>::size() {
@@ -208,12 +255,6 @@ void Dictionary<T>::print(int row) {
 	for (int i = 0; i < items->size() && i < row; i++) {
 		cout << "Dictionary[" << i << "] = " << items->at(i) << "\n";
 	}
-}
-
-template<class T>
-Dictionary<T>::~Dictionary() {
-	delete items;
-	delete sMap;
 }
 
 template class Dictionary<string> ;

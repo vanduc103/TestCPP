@@ -9,6 +9,7 @@
 
 #include "ColumnBase.h"
 #include <vector>
+#include <string>
 #include <map>
 #include <algorithm>
 
@@ -22,12 +23,29 @@ private:
 	  {return lhs<rhs;}
 	};
 
+	struct invertedIndex {
+		string word;
+		char position;	 // position on text
+		vector<size_t> location; // position on dictionary
+	};
+
 	vector<T>* items;
 	std::map<T, size_t, classcomp>* sMap;
 	vector<T>* bulkVecValue;
+	vector<invertedIndex>* vecInvertedIndex;
 public:
-	Dictionary();
-	virtual ~Dictionary();
+	Dictionary() {
+		items = new vector<T>();
+		sMap = new map<T, size_t, classcomp>();
+		bulkVecValue = new vector<T>();
+		vecInvertedIndex = new vector<invertedIndex>();
+	}
+	virtual ~Dictionary() {
+		delete items;
+		delete vecInvertedIndex;
+		delete sMap;
+		delete bulkVecValue;
+	}
 
 	T* lookup(size_t index);
 	void search(T& value, ColumnBase::OP_TYPE opType, vector<size_t>& result);
@@ -41,8 +59,10 @@ public:
 
 	void clearTemp() {
 		sMap->clear();
-		bulkVecValue->clear();
+		bulkVecValue->resize(0);
 	}
+
+	void buildInvertedIndex();
 };
 
 

@@ -153,7 +153,7 @@ int main(void) {
 	string filePath;
 	//getline(cin, filePath);
 	//ifstream infile(filePath);
-	ifstream infile("/home/duclv/homework/data.csv");
+	ifstream infile("/home/duclv/homework/data1M.csv");
 	string line;
 	string delim = ",";
 	int row = 0;
@@ -243,7 +243,7 @@ int main(void) {
 	// print result
 	//col1->printVecValue(10);
 	//col2->printVecValue(10);
-	//((Column<string>*)columns[1])->getDictionary()->print(10);
+	//((Column<string>*)columns[3])->getDictionary()->print(10);
 
 	// loaded time
 	cout << "Table Load time: " << float( clock () - begin_time ) /  CLOCKS_PER_SEC << " seconds " << endl;
@@ -276,7 +276,7 @@ int main(void) {
 	col2->setSize(1);
 
 	// read data into column
-	filePath = "/home/duclv/homework/lineitem.tbl";
+	filePath = "/home/duclv/homework/lineitem1M.tbl";
 	ifstream infile2(filePath);
 	if (!infile2) {
 		cout << "Cannot open file path: " << filePath << endl;
@@ -504,6 +504,17 @@ int main(void) {
 								q_where_ops.push_back(ColumnBase::OP_TYPE::ltOp);
 							else if (expr->op_char == '=')
 								q_where_ops.push_back(ColumnBase::OP_TYPE::equalOp);
+
+							hsql::ExprType literalType = expr->expr2->type;
+							if (literalType == hsql::ExprType::kExprLiteralInt)
+								q_where_values.push_back(to_string(expr->expr2->ival));
+							else if (literalType == hsql::ExprType::kExprColumnRef)
+								q_where_values.push_back(expr->expr2->name);
+						}
+						else if (expr->op_type == hsql::Expr::OperatorType::LIKE) {
+							q_where_fields.push_back(expr->expr->name);
+
+							q_where_ops.push_back(ColumnBase::OP_TYPE::likeOp);
 
 							hsql::ExprType literalType = expr->expr2->type;
 							if (literalType == hsql::ExprType::kExprLiteralInt)

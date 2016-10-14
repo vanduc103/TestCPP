@@ -122,10 +122,15 @@ public:
 				vector<size_t> result;
 				dictionary->search(bulkVecValue->at(i), ColumnBase::equalOp, result);
 				size_t pos = result[0];
-				if (pos != -1)
-					vecValue->push_back(pos);
+				if (pos != -1) vecValue->push_back(pos);
 			}
 		}
+		bulkVecValue->resize(0);
+	}
+
+	void createInvertedIndex() {
+		if (dictionary != NULL)
+			dictionary->buildInvertedIndex();
 	}
 
 	bool selection(T& searchValue, ColumnBase::OP_TYPE q_where_op,
@@ -133,10 +138,11 @@ public:
 		vector<size_t> result;
 		this->getDictionary()->search(searchValue, q_where_op, result);
 
-		// find rowId with appropriate encodeValue
+		// find rowId with appropriate dictionary position
 		for (size_t rowId = 0; !result.empty() && rowId < this->vecValueSize(); rowId++) {
-			size_t encodeValue = this->vecValueAt(rowId);
-			if (encodeValue >= result.front() && encodeValue <= result.back()) {
+			size_t dictPosition = this->vecValueAt(rowId);
+			if ((q_where_op != ColumnBase::likeOp && dictPosition >= result.front() && dictPosition <= result.back())
+				|| (q_where_op == ColumnBase::likeOp && binary_search(result.begin(), result.end(), dictPosition))) {
 				// first where expr => used to init query result
 				if (initQueryResult)
 					q_resultRid->push_back(true); //rowId is in query result
