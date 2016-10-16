@@ -128,7 +128,7 @@ void Dictionary<T>::search(T& value, ColumnBase::OP_TYPE opType, vector<size_t>&
 			}
 			break;
 		}
-		case ColumnBase::likeOp: {
+		case ColumnBase::containOp: {
 			// search by inverted index
 			for (size_t i = 0; i < vecInvertedIndex->size(); i++) {
 				invertedIndex idx = vecInvertedIndex->at(i);

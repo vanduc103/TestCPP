@@ -134,21 +134,21 @@ public:
 	}
 
 	bool selection(T& searchValue, ColumnBase::OP_TYPE q_where_op,
-					vector<bool>* q_resultRid, bool initQueryResult) {
+					vector<bool>* q_resultRid, bool initQueryResult = false) {
 		vector<size_t> result;
 		this->getDictionary()->search(searchValue, q_where_op, result);
 
 		// find rowId with appropriate dictionary position
 		for (size_t rowId = 0; !result.empty() && rowId < this->vecValueSize(); rowId++) {
 			size_t dictPosition = this->vecValueAt(rowId);
-			if ((q_where_op != ColumnBase::likeOp && dictPosition >= result.front() && dictPosition <= result.back())
-				|| (q_where_op == ColumnBase::likeOp && binary_search(result.begin(), result.end(), dictPosition))) {
+			if ((q_where_op != ColumnBase::containOp && dictPosition >= result.front() && dictPosition <= result.back())
+				|| (q_where_op == ColumnBase::containOp && binary_search(result.begin(), result.end(), dictPosition))) {
 				// first where expr => used to init query result
 				if (initQueryResult)
 					q_resultRid->push_back(true); //rowId is in query result
 				else {
-					if (q_resultRid->at(rowId)) {
-						// keep this row id in result - do nothing
+					if (!q_resultRid->at(rowId)) {
+						q_resultRid->at(rowId) = true;
 					}
 				}
 			}

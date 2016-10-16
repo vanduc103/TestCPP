@@ -39,7 +39,7 @@ std::ostream& operator<<(std::ostream& out, const ColumnBase::OP_TYPE value){
         PROCESS_VAL(ColumnBase::OP_TYPE::geOp, ">=");
         PROCESS_VAL(ColumnBase::OP_TYPE::ltOp, "<");
         PROCESS_VAL(ColumnBase::OP_TYPE::leOp, "<=");
-        PROCESS_VAL(ColumnBase::OP_TYPE::likeOp, "LIKE");
+        PROCESS_VAL(ColumnBase::OP_TYPE::containOp, "CONTAIN");
     }
 #undef PROCESS_VAL
     return out << s;
@@ -171,32 +171,11 @@ int main(void) {
 		    else
 		    	items.push_back(token);
 		    ++idx;
-
-		    /*i++;
-		    // key is 1st column
-			if (i == 1) {
-				int key = stoi(token);
-				col0->updateDictionary(key, !col0->primaryKey());
-			}
-		    // status is 2nd column
-			else if (i == 2) {
-				boost::replace_all(token, "\"", "");
-		    	col1->updateDictionary(token, col1->getType() == ColumnBase::intType);
-		    }
-		    // totalprice is 3rd column
-		    else if (i == 3) {
-		    	int totalprice = stoi(token);
-		    	col2->updateDictionary(totalprice, col2->getType() == ColumnBase::intType);
-		    }
-		    // comment is from 4th column
-			if (i >= 4) comment += token + delim;*/
 		}
 		// get the last token and add to last item
 		token = line.substr(last);
 		lastItem += token;
 		items.push_back(lastItem);
-		/*boost::replace_all(comment, "\"", "");
-		col3->updateDictionary(comment, col3->getType() == ColumnBase::intType);*/
 
 		// process input data based on column type
 		for (int i = 0; i < table->numOfColumns(); i++) {
@@ -232,10 +211,6 @@ int main(void) {
 			cout << col->getName() << " #distinct values = " << col->getDictionary()->size()<<"/"<<row << endl;
 		}
 	}
-	/*cout << col0->getName() << " #distinct values = " << col0->getDictionary()->size()<<"/"<<row << endl;
-	cout << col1->getName() << " #distinct values = " << col1->getDictionary()->size()<<"/"<<row << endl;
-	cout << col2->getName() << " #distinct values = " << col2->getDictionary()->size()<<"/"<<row << endl;
-	cout << col3->getName() << " #distinct values = " << col3->getDictionary()->size()<<"/"<<row << endl;*/
 
 	// process columns of table
 	table->processColumn();
@@ -329,25 +304,25 @@ int main(void) {
 	// query
 	while (true) {
 		string query = "Select * from orders where o_totalprice < 56789 and o_totalprice > 5678";
-		cout << "Enter a query: ";
+		cout << "Enter a query or select join query example (join1/join2/join3): ";
 		getline(cin, query);
 		if ("quit" == query)
 			break;
 
-		// Join test
-		if ("join" == query) {
+		// Join example
+		if (query.find("join") != string::npos) {
 			begin_time = clock();
 			// join l_orderkey with o_orderkey
 			Column<int>* l_orderkey = (Column<int>*) table2->getColumnByName("l_orderkey");
 			Column<int>* o_orderkey = (Column<int>*) table->getColumnByName("o_orderkey");
 			// initialize matching row ids
-			vector<bool> l_rowIds;
+			vector<bool>* l_rowIds = new vector<bool>();
 			for (size_t i = 0; i < l_orderkey->vecValueSize(); i++) {
-				l_rowIds.push_back(0);
+				l_rowIds->push_back(0);
 			}
-			vector<bool> o_rowIds;
+			vector<bool>* o_rowIds = new vector<bool>();
 			for (size_t i = 0;i < o_orderkey->vecValueSize(); i++) {
-				o_rowIds.push_back(0);
+				o_rowIds->push_back(0);
 			}
 			// process hash and probe
 			if (l_orderkey->getSize() >= o_orderkey->getSize()) {
@@ -379,9 +354,9 @@ int main(void) {
 					vector<size_t>* rowIds = hashmap[valueId2];
 					if (rowIds != NULL) {
 						// keep row id
-						l_rowIds[rowId] = 1;
+						l_rowIds->at(rowId) = true;
 						for (size_t o_rowId : *rowIds)
-							o_rowIds[o_rowId] = 1;
+							o_rowIds->at(o_rowId) = true;
 					}
 				}
 			}
@@ -414,40 +389,87 @@ int main(void) {
 					vector<size_t>* rowIds = hashmap[valueId2];
 					if (rowIds != NULL) {
 						// keep row id
-						o_rowIds[rowId] = 1;
+						o_rowIds->at(rowId) = true;
 						for (size_t l_rowId : *rowIds)
-							l_rowIds[l_rowId] = 1;
+							l_rowIds->at(l_rowId) = true;
 					}
 				}
+			}
+			// join example 2: orders.o_totalprice < 56789 AND l_quantity > 40
+			if (query.find("2") != string::npos) {
+				Column<int>* o_totalprice = (Column<int>*) table->getColumnByName("o_totalprice");
+				Column<int>* l_quantity = (Column<int>*) table2->getColumnByName("l_quantity");
+				// execute where query
+				int value = 56789;
+				o_totalprice->selection(value, ColumnBase::ltOp, o_rowIds);
+				value = 40;
+				l_quantity->selection(value, ColumnBase::gtOp, l_rowIds);
+			}
+			// join example 3: orders.o_comment contains ‘gift’
+			else if (query.find("3") != string::npos) {
+				Column<string>* o_comment = (Column<string>*) table->getColumnByName("o_comment");
+				// execute where query
+				string value = "gift";
+				o_comment->selection(value, ColumnBase::containOp, o_rowIds);
 			}
 			// print the result based on matching row ids
 			cout << "********* Print join result ************" << endl;
 			size_t l_totalresult = 0;
-			for (size_t i = 0; i < l_rowIds.size(); i++) {
-				if (l_rowIds[i])
+			for (size_t i = 0; i < l_rowIds->size(); i++) {
+				if (l_rowIds->at(i))
 					++l_totalresult;
 			}
 			size_t o_totalresult = 0;
-			for (size_t i = 0; i < o_rowIds.size(); i++) {
-				if (o_rowIds[i])
+			for (size_t i = 0; i < o_rowIds->size(); i++) {
+				if (o_rowIds->at(i))
 					++o_totalresult;
 			}
-			size_t limit = 20;
+			size_t limit = 10;
 			size_t limitCount = 0;
-			cout << "orders result:" << endl;
-			vector<int> o_output = o_orderkey->projection(&o_rowIds, limit, limitCount);
-			for (auto o : o_output) {
-				cout << o << endl;
+			vector<string> q_select_fields;
+			for (ColumnBase* colBase : (*table->columns())) {
+				q_select_fields.push_back(colBase->getName());
 			}
-			cout << "Print " << limit << "/" << o_totalresult << " results !" << endl;
+			vector<string> outputs (limit + 1);
+			for (size_t idx = 0; idx < q_select_fields.size(); idx++) {
+				string select_field_name = q_select_fields[idx];
+				outputs[0] += select_field_name + ", ";
+				ColumnBase* colBase = (ColumnBase*) table->getColumnByName(select_field_name);
+				if (colBase == NULL) continue;
+				if (colBase->getType() == ColumnBase::intType) {
+					Column<int>* t = (Column<int>*) colBase;
+					vector<int> tmpOut = t->projection(o_rowIds, limit, limitCount);
+					for (size_t i = 0; i < tmpOut.size(); i++) {
+						outputs[i+1] += to_string(tmpOut[i]) + ",   ";
+					}
+				}
+				else {
+					Column<string>* t = (Column<string>*) colBase;
+					vector<string> tmpOut = t->projection(o_rowIds, limit, limitCount);
+					for (size_t i = 0; i < tmpOut.size(); i++) {
+						outputs[i+1] += "\"" + tmpOut[i] + "\"" + ",   ";
+					}
+				}
+			}
+			for (string output : outputs) {
+				if (!output.empty())
+					cout << output << endl;
+			}
+			if (limitCount >= limit)
+				cout << "Showing "<<limit<<"/"<<o_totalresult<<" results !" << endl;
+			else if (limitCount == 0)
+				cout << "No result found !" << endl;
+			else
+				cout << "Showing "<<limitCount<<"/"<<o_totalresult<<" results !" << endl;
 			//
-			cout << "lineitem result:" << endl;
+			/*cout << "lineitem result:" << endl;
 			vector<int> l_output = l_orderkey->projection(&l_rowIds, limit, limitCount);
 			for (auto l : l_output) {
 				cout << l << endl;
 			}
-			cout << "Print " << limit << "/" << l_totalresult << " results !" << endl;
-			std::cout << "Join query time: " << float(clock() - begin_time)/CLOCKS_PER_SEC << " seconds " << endl;
+			cout << "Print " << limit << "/" << l_totalresult << " results !" << endl;*/
+			delete l_rowIds;
+			std::cout << "Query time: " << float(clock() - begin_time)/CLOCKS_PER_SEC << " seconds " << endl;
 			continue;
 		}
 
@@ -514,7 +536,7 @@ int main(void) {
 						else if (expr->op_type == hsql::Expr::OperatorType::LIKE) {
 							q_where_fields.push_back(expr->expr->name);
 
-							q_where_ops.push_back(ColumnBase::OP_TYPE::likeOp);
+							q_where_ops.push_back(ColumnBase::OP_TYPE::containOp);
 
 							hsql::ExprType literalType = expr->expr2->type;
 							if (literalType == hsql::ExprType::kExprLiteralInt)

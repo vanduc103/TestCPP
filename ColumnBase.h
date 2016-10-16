@@ -15,7 +15,7 @@ namespace std {
 class ColumnBase {
 public:
 	enum COLUMN_TYPE {intType, charType, varcharType};
-	enum OP_TYPE {equalOp, neOp, ltOp, leOp, gtOp, geOp, likeOp};
+	enum OP_TYPE {equalOp, neOp, ltOp, leOp, gtOp, geOp, containOp};
 private:
 	string name;
 	COLUMN_TYPE type;
