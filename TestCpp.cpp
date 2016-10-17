@@ -342,7 +342,7 @@ int main(void) {
 				}
 
 				// build hashmap for smaller column
-				map<size_t, vector<size_t>*> hashmap;
+				map<size_t, vector<size_t>> hashmap;
 				o_orderkey->buildHashmap(hashmap);
 
 				// probe (join) to find matching row ids
@@ -351,12 +351,13 @@ int main(void) {
 					// get valueId2 from mapping
 					size_t valueId2 = mappingValueId[valueId1];
 					// found on hashmap
-					vector<size_t>* rowIds = hashmap[valueId2];
-					if (rowIds != NULL) {
+					vector<size_t> rowIds = hashmap[valueId2];
+					if (rowIds.size() > 0) {
 						// keep row id
 						l_rowIds->at(rowId) = true;
-						for (size_t o_rowId : *rowIds)
+						for (size_t o_rowId : rowIds) {
 							o_rowIds->at(o_rowId) = true;
+						}
 					}
 				}
 			}
@@ -377,7 +378,7 @@ int main(void) {
 				}
 
 				// build hashmap for smaller column
-				map<size_t, vector<size_t>*> hashmap;
+				map<size_t, vector<size_t>> hashmap;
 				l_orderkey->buildHashmap(hashmap);
 
 				// probe (join) to find matching row ids
@@ -386,11 +387,11 @@ int main(void) {
 					// get valueId2 from mapping
 					size_t valueId2 = mappingValueId[valueId1];
 					// found on hashmap
-					vector<size_t>* rowIds = hashmap[valueId2];
-					if (rowIds != NULL) {
+					vector<size_t> rowIds = hashmap[valueId2];
+					if (rowIds.size() > 0) {
 						// keep row id
 						o_rowIds->at(rowId) = true;
-						for (size_t l_rowId : *rowIds)
+						for (size_t l_rowId : rowIds)
 							l_rowIds->at(l_rowId) = true;
 					}
 				}
@@ -461,6 +462,7 @@ int main(void) {
 				cout << "No result found !" << endl;
 			else
 				cout << "Showing "<<limitCount<<"/"<<o_totalresult<<" results !" << endl;
+			delete o_rowIds;
 			//
 			/*cout << "lineitem result:" << endl;
 			vector<int> l_output = l_orderkey->projection(&l_rowIds, limit, limitCount);
@@ -671,6 +673,7 @@ int main(void) {
 					cout << "No result found !" << endl;
 				else
 					cout << "Showing "<<limitCount<<"/"<<totalResult<<" results !" << endl;
+				delete q_resultRid;
 				// query time
 				std::cout << "Table Selection time: " << float(clock() - begin_time)/CLOCKS_PER_SEC << " seconds " << endl;
 				// Processe done !

@@ -48,6 +48,7 @@ public:
 		if (vecValue == NULL) {
 			vecValue = new vector<size_t>();
 		}
+		vecValue->clear();
 		for (int i = 0; i < packed->count; i++) {
 			vecValue->push_back(PackedArray_get(packed, i));
 		}
@@ -179,27 +180,27 @@ public:
 	}
 
 	// Loop through vecValue (at bit packed) to build hashmap of valueId
-	void buildHashmap(map<size_t, vector<size_t>*>& hashmap) {
+	void buildHashmap(map<size_t, vector<size_t>>& hashmap) {
+		hashmap.clear();
 		// unpack vecValue to build hash map
 		vecValue = getVecValue();
 		for (size_t rowId = 0; rowId < vecValue->size(); rowId++) {
 			size_t valueId = vecValue->at(rowId);
-			if (hashmap[valueId] == NULL)
-				hashmap[valueId] = new vector<size_t>();
-			hashmap[valueId]->push_back(rowId);
+			hashmap[valueId].push_back(rowId);
 		}
 	}
 
 	// Return vector of matching row ids
-	vector<size_t>* probe(map<size_t, vector<size_t>*>* hashmap, size_t probedValue) {
+	vector<size_t> probe(map<size_t, vector<size_t>>* hashmap, size_t probedValue) {
 		if (hashmap != NULL) {
 			try {
 				return hashmap->at(probedValue);
 			} catch (exception& e) {
-				return NULL;
+				// empty vector
+				return vector<size_t>();
 			}
 		}
-		return NULL;
+		return vector<size_t>();
 	}
 };
 
