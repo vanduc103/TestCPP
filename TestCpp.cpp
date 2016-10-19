@@ -3,7 +3,7 @@
 // Author      : Le Van Duc
 // Version     :
 // Copyright   : 
-// Description : Hello World in C, Ansi-style
+// Description : Test C++
 //============================================================================
 
 #include <stdio.h>
@@ -18,13 +18,13 @@
 #include <stdexcept>
 #include <map>
 #include <boost/algorithm/string.hpp>
-#include <boost/dynamic_bitset.hpp>
 
 #include "Dictionary.h"
 #include "Column.h"
 #include "ColumnBase.h"
 #include "Table.h"
 #include "SQLParser.h"
+#include "Util.h"
 
 using namespace std;
 
@@ -92,7 +92,7 @@ int main(void) {
 		cout << "Create table statement is Invalid !" << endl;
 		return -1;
 	}
-	cout << "tablename: " << tableName << endl;
+	//cout << "tablename: " << tableName << endl;
 	// init table
 	vector<ColumnBase*> columns;
 	Table* table = new Table(columns);
@@ -101,8 +101,8 @@ int main(void) {
 	for (size_t i = 0; i < cColumnName.size(); i++) {
 		string name = cColumnName[i];
 		ColumnBase::COLUMN_TYPE type = cColumnType[i];
-		cout << "colname: " << name << endl;
-		cout << "col type: " << type << endl;
+		//cout << "colname: " << name << endl;
+		//cout << "col type: " << type << endl;
 		// create new column
 		ColumnBase* colBase = new ColumnBase();
 		if (type == ColumnBase::intType) {
@@ -315,6 +315,7 @@ int main(void) {
 			// join l_orderkey with o_orderkey
 			Column<int>* l_orderkey = (Column<int>*) table2->getColumnByName("l_orderkey");
 			Column<int>* o_orderkey = (Column<int>*) table->getColumnByName("o_orderkey");
+
 			// initialize matching row ids
 			vector<bool>* l_rowIds = new vector<bool>();
 			for (size_t i = 0; i < l_orderkey->vecValueSize(); i++) {
@@ -324,8 +325,27 @@ int main(void) {
 			for (size_t i = 0;i < o_orderkey->vecValueSize(); i++) {
 				o_rowIds->push_back(0);
 			}
+
+			// join example 2: orders.o_totalprice < 56789 AND l_quantity > 40
+			if (query.find("2") != string::npos) {
+				Column<int>* o_totalprice = (Column<int>*) table->getColumnByName("o_totalprice");
+				Column<int>* l_quantity = (Column<int>*) table2->getColumnByName("l_quantity");
+				// execute where query
+				int value = 56789;
+				o_totalprice->selection(value, ColumnBase::ltOp, o_rowIds);
+				value = 40;
+				l_quantity->selection(value, ColumnBase::gtOp, l_rowIds);
+			}
+			// join example 3: orders.o_comment contains ‘gift’
+			else if (query.find("3") != string::npos) {
+				Column<string>* o_comment = (Column<string>*) table->getColumnByName("o_comment");
+				// execute where query
+				string value = "gift";
+				o_comment->selection(value, ColumnBase::containOp, o_rowIds);
+			}
+
 			// process hash and probe
-			if (l_orderkey->getSize() >= o_orderkey->getSize()) {
+			if (Util::rowSelectedSize(l_rowIds) >= Util::rowSelectedSize(o_rowIds)) {
 				// create mapping between vecValue of 2 join columns
 				map<size_t, size_t> mappingValueId;
 				for (size_t i = 0; i < l_orderkey->getDictionary()->size(); i++) {
@@ -396,23 +416,7 @@ int main(void) {
 					}
 				}
 			}
-			// join example 2: orders.o_totalprice < 56789 AND l_quantity > 40
-			if (query.find("2") != string::npos) {
-				Column<int>* o_totalprice = (Column<int>*) table->getColumnByName("o_totalprice");
-				Column<int>* l_quantity = (Column<int>*) table2->getColumnByName("l_quantity");
-				// execute where query
-				int value = 56789;
-				o_totalprice->selection(value, ColumnBase::ltOp, o_rowIds);
-				value = 40;
-				l_quantity->selection(value, ColumnBase::gtOp, l_rowIds);
-			}
-			// join example 3: orders.o_comment contains ‘gift’
-			else if (query.find("3") != string::npos) {
-				Column<string>* o_comment = (Column<string>*) table->getColumnByName("o_comment");
-				// execute where query
-				string value = "gift";
-				o_comment->selection(value, ColumnBase::containOp, o_rowIds);
-			}
+
 			// print the result based on matching row ids
 			cout << "********* Print join result ************" << endl;
 			size_t l_totalresult = 0;

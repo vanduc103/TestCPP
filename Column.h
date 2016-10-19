@@ -15,6 +15,7 @@
 #include <string>
 #include <map>
 #include <stdexcept>
+#include <algorithm>
 #include "ColumnBase.h"
 #include "Dictionary.h"
 #include "PackedArray.h"

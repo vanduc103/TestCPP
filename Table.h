@@ -71,7 +71,9 @@ public:
 				if (col->isBulkInsert()) {
 					col->bulkBuildVecVector();
 				}
-				col->createInvertedIndex();
+				if (col->isCreateInvertedIndex()) {
+					col->createInvertedIndex();
+				}
 				col->getDictionary()->clearTemp();
 				col->bitPackingVecValue();
 			}

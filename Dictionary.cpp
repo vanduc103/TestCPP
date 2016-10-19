@@ -141,7 +141,7 @@ void Dictionary<T>::search(T& value, ColumnBase::OP_TYPE opType, vector<size_t>&
 		case ColumnBase::containOp: {
 			// search by inverted index
 			struct invertedIndex idxContain;
-			strTolower(value);	// to lower for comparision with index
+			strTolower(value);	// to lower to compare with index
 			idxContain.word = value;
 			typename vector<invertedIndex>::iterator lowerIdx;
 			lowerIdx = std::lower_bound(vecIndexLevel0->begin(), vecIndexLevel0->end(),

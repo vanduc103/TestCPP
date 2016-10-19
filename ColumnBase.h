@@ -21,6 +21,7 @@ private:
 	COLUMN_TYPE type;
 	int size;
 	bool isPrimaryKey = false; // default is false
+	bool createInvertedIndex = false; // create inverted index for this column ?
 public:
 	ColumnBase();
 	virtual ~ColumnBase();
@@ -36,6 +37,9 @@ public:
 
 	bool primaryKey();
 	void setPrimaryKey(bool isPrimaryKey);
+
+	bool isCreateInvertedIndex() {return createInvertedIndex; }
+	void setCreateInvertedIndex(bool createInvertedIndex) {this->createInvertedIndex = createInvertedIndex; }
 };
 
 } /* namespace std */
