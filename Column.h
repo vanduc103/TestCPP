@@ -188,6 +188,8 @@ public:
 			size_t valueId = vecValue->at(rowId);
 			hashmap[valueId].push_back(rowId);
 		}
+		// clear vecValue
+		vecValue->resize(0);
 	}
 
 	// Return vector of matching row ids

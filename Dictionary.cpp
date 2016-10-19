@@ -15,6 +15,8 @@
 #include <iterator>
 #include <map>
 #include <unordered_map>
+#include <algorithm>
+#include <locale>
 #include "Dictionary.h"
 
 using namespace std;
@@ -32,6 +34,14 @@ bool equalFunc(T value1, T value2) {
 bool equalFunc(string value1, int value2) {
 	return false;
 };
+
+void strTolower(string& value) {
+	transform(value.begin(), value.end(), value.begin(), ::tolower);
+}
+
+void strTolower(int& value) {
+	// do nothing
+}
 
 template<class T>
 T* Dictionary<T>::lookup(size_t index) {
@@ -130,14 +140,27 @@ void Dictionary<T>::search(T& value, ColumnBase::OP_TYPE opType, vector<size_t>&
 		}
 		case ColumnBase::containOp: {
 			// search by inverted index
-			for (size_t i = 0; i < vecInvertedIndex->size(); i++) {
+			struct invertedIndex idxContain;
+			strTolower(value);	// to lower for comparision with index
+			idxContain.word = value;
+			typename vector<invertedIndex>::iterator lowerIdx;
+			lowerIdx = std::lower_bound(vecIndexLevel0->begin(), vecIndexLevel0->end(),
+					idxContain);
+			// found
+			if (lowerIdx != vecIndexLevel0->end() && *lowerIdx == idxContain) {
+				invertedIndex idx = vecIndexLevel0->at(lowerIdx - vecIndexLevel0->begin());
+				result.insert(result.end(), idx.location.begin(), idx.location.end());
+				// sort result
+				std::sort(result.begin(), result.end());
+			}
+			/*for (size_t i = 0; i < vecInvertedIndex->size(); i++) {
 				invertedIndex idx = vecInvertedIndex->at(i);
 				if (equalFunc(idx.word, value)) {
 					result.insert(result.end(), idx.location.begin(), idx.location.end());
 					// sort result
-					sort(result.begin(), result.end());
+					std::sort(result.begin(), result.end());
 				}
-			}
+			}*/
 			break;
 		}
 		}
@@ -207,11 +230,12 @@ size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue, bool sor
 	}
 }
 
-template<class T>
-void Dictionary<T>::buildInvertedIndex() {
+template<>
+void Dictionary<string>::buildInvertedIndex() {
 	// make an unordered_map of words from all items
 	vector<string>* strItems = (vector<string>*) items;
 	unordered_map<string, vector<size_t>> mapWords;
+	unordered_map<string, vector<size_t>> mapWordsLevel0;
 	for (size_t i = 0; i < strItems->size(); i++) {
 		// split item into word by whitespace
 		vector<string> words;
@@ -222,8 +246,11 @@ void Dictionary<T>::buildInvertedIndex() {
 			// map key = word + position in text
 			string key = words[j] + "#" + to_string(j);
 			vector<size_t> location = mapWords[key];
+			vector<size_t> locationLevel0 = mapWordsLevel0[words[j]];
 			location.push_back(i); // text position
+			locationLevel0.push_back(i);
 			mapWords[key] = location;
+			mapWordsLevel0[words[j]] = locationLevel0;
 		}
 	}
 	// create vector of inverted index from map
@@ -233,13 +260,28 @@ void Dictionary<T>::buildInvertedIndex() {
 		size_t findPos = key.find('#');
 		string word = key.substr(0, findPos);
 		char position = stoi(key.substr(findPos + 1));
-		//
+		// inverted index with position
 		invertedIndex idx;
+		strTolower(word); // keep lower word
 		idx.word = word;
 		idx.position = position;
 		idx.location = location;
 		vecInvertedIndex->push_back(idx);
 	}
+	// create vector of inverted index level 0 from map
+	for (const auto& m : mapWordsLevel0) {
+		string word = m.first;
+		vector<size_t> location = m.second;
+		// inverted index level 0
+		invertedIndex idxLevel0;
+		strTolower(word); // keep lower word
+		idxLevel0.word = word;
+		idxLevel0.location = location;
+		vecIndexLevel0->push_back(idxLevel0);
+	}
+	// sort vector of inverted index
+	std::sort(vecInvertedIndex->begin(), vecInvertedIndex->end());
+	std::sort(vecIndexLevel0->begin(), vecIndexLevel0->end());
 	//for (size_t i = 0; i < vecInvertedIndex->size(); i++)
 	//cout << "Phan tu " << i << " = " << (vecInvertedIndex->at(i)).word << "," << to_string((vecInvertedIndex->at(i)).position) << endl;
 }

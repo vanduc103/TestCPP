@@ -153,7 +153,7 @@ int main(void) {
 	string filePath;
 	//getline(cin, filePath);
 	//ifstream infile(filePath);
-	ifstream infile("/home/duclv/homework/data1M.csv");
+	ifstream infile("/home/duclv/homework/data.csv");
 	string line;
 	string delim = ",";
 	int row = 0;
@@ -251,7 +251,7 @@ int main(void) {
 	col2->setSize(1);
 
 	// read data into column
-	filePath = "/home/duclv/homework/lineitem1M.tbl";
+	filePath = "/home/duclv/homework/lineitem.tbl";
 	ifstream infile2(filePath);
 	if (!infile2) {
 		cout << "Cannot open file path: " << filePath << endl;

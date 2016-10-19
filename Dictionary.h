@@ -11,7 +11,6 @@
 #include <vector>
 #include <string>
 #include <map>
-#include <algorithm>
 
 using namespace std;
 
@@ -27,22 +26,34 @@ private:
 		string word;
 		char position;	 // position on text
 		vector<size_t> location; // position on dictionary
+		// functions
+		bool operator<(const invertedIndex& a) const
+		{
+			return word < a.word;
+		}
+		bool operator==(const invertedIndex& a) const
+		{
+			return word == a.word;
+		}
 	};
 
 	vector<T>* items;
 	std::map<T, size_t, classcomp>* sMap;
 	vector<T>* bulkVecValue;
 	vector<invertedIndex>* vecInvertedIndex;
+	vector<invertedIndex>* vecIndexLevel0;
 public:
 	Dictionary() {
 		items = new vector<T>();
 		sMap = new map<T, size_t, classcomp>();
 		bulkVecValue = new vector<T>();
 		vecInvertedIndex = new vector<invertedIndex>();
+		vecIndexLevel0 = new vector<invertedIndex>();
 	}
 	virtual ~Dictionary() {
 		delete items;
 		delete vecInvertedIndex;
+		delete vecIndexLevel0;
 		delete sMap;
 		delete bulkVecValue;
 	}
