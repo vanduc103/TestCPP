@@ -180,17 +180,17 @@ public:
 		return outputs;
 	}
 
-	// Loop through vecValue (at bit packed) to build hashmap of valueId
-	void buildHashmap(map<size_t, vector<size_t>>& hashmap) {
+	// Build hashmap of valueId based on selected row ids
+	void buildHashmap(map<size_t, vector<size_t>>& hashmap, vector<bool>* vecRowId) {
 		hashmap.clear();
-		// unpack vecValue to build hash map
-		vecValue = getVecValue();
-		for (size_t rowId = 0; rowId < vecValue->size(); rowId++) {
-			size_t valueId = vecValue->at(rowId);
-			hashmap[valueId].push_back(rowId);
+		for (size_t rowId = 0; rowId < vecRowId->size(); rowId++) {
+			// get valueId from bit packing if row id is selected
+			// then build hashmap
+			if (vecRowId->at(rowId)) {
+				size_t valueId = vecValueAt(rowId);
+				hashmap[valueId].push_back(rowId);
+			}
 		}
-		// clear vecValue
-		vecValue->resize(0);
 	}
 
 	// Return vector of matching row ids

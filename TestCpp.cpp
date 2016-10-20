@@ -92,7 +92,7 @@ int main(void) {
 		cout << "Create table statement is Invalid !" << endl;
 		return -1;
 	}
-	//cout << "tablename: " << tableName << endl;
+	cout << "tablename: " << tableName << endl;
 	// init table
 	vector<ColumnBase*> columns;
 	Table* table = new Table(columns);
@@ -115,35 +115,10 @@ int main(void) {
 		}
 		colBase->setName(name);
 		colBase->setType(type);
-		/*if (i == 0)
-			colBase->setPrimaryKey(true);*/
+		if (name == "o_orderkey") colBase->setPrimaryKey(true);
+		//if (name == "o_comment") colBase->setCreateInvertedIndex(true);
 		columns.push_back(colBase);
 	}
-
-	// Column 0
-	/*Column<int>* col0 = new Column<int>();
-	col0->setName("o_orderkey");
-	col0->setType(ColumnBase::intType);
-	col0->setSize(4);
-	col0->setPrimaryKey(true);
-
-	// Column 1
-	Column<string>* col1 = new Column<string>();
-	col1->setName("o_orderstatus");
-	col1->setType(ColumnBase::charType);
-	col1->setSize(1);
-
-	// Column 2
-	Column<int>* col2 = new Column<int>();
-	col2->setName("o_totalprice");
-	col2->setType(ColumnBase::intType);
-	col2->setSize(4);
-
-	// Column 3
-	Column<string>* col3 = new Column<string>();
-	col3->setName("o_comment");
-	col3->setType(ColumnBase::charType);
-	col3->setSize(30);*/
 
 	// calculate time execution
 	clock_t begin_time = clock();
@@ -153,7 +128,7 @@ int main(void) {
 	string filePath;
 	//getline(cin, filePath);
 	//ifstream infile(filePath);
-	ifstream infile("/home/duclv/homework/data.csv");
+	ifstream infile("/home/duclv/homework/data1M.csv");
 	string line;
 	string delim = ",";
 	int row = 0;
@@ -183,7 +158,7 @@ int main(void) {
 			ColumnBase* colBase = columns[i];
 			if (colBase->getType() == ColumnBase::intType) {
 				int intValue = stoi(item);
-				bool sorted = true; //!(colBase->primaryKey());
+				bool sorted = true;
 				// update dictionary
 				Column<int>* col = (Column<int>*) colBase;
 				col->updateDictionary(intValue, sorted);
@@ -231,6 +206,7 @@ int main(void) {
 	vector<ColumnBase*> columns2;
 	Table* table2 = new Table(columns2);
 	table2->setName("lineitem");
+	cout << "table name: " << table2->getName() << endl;
 
 	// Column 0
 	Column<int>* col0 = new Column<int>();
@@ -251,7 +227,7 @@ int main(void) {
 	col2->setSize(1);
 
 	// read data into column
-	filePath = "/home/duclv/homework/lineitem.tbl";
+	filePath = "/home/duclv/homework/lineitem1M.tbl";
 	ifstream infile2(filePath);
 	if (!infile2) {
 		cout << "Cannot open file path: " << filePath << endl;
@@ -319,11 +295,11 @@ int main(void) {
 			// initialize matching row ids
 			vector<bool>* l_rowIds = new vector<bool>();
 			for (size_t i = 0; i < l_orderkey->vecValueSize(); i++) {
-				l_rowIds->push_back(0);
+				l_rowIds->push_back(false);
 			}
 			vector<bool>* o_rowIds = new vector<bool>();
 			for (size_t i = 0;i < o_orderkey->vecValueSize(); i++) {
-				o_rowIds->push_back(0);
+				o_rowIds->push_back(false);
 			}
 
 			// join example 2: orders.o_totalprice < 56789 AND l_quantity > 40
@@ -342,6 +318,16 @@ int main(void) {
 				// execute where query
 				string value = "gift";
 				o_comment->selection(value, ColumnBase::containOp, o_rowIds);
+			}
+			// join example 1: no where selection
+			else {
+				// all rows of 2 joining tables are selected
+				for (size_t i = 0; i < l_rowIds->size(); i++) {
+					l_rowIds->at(i) = true;
+				}
+				for (size_t i = 0;i < o_rowIds->size(); i++) {
+					o_rowIds->at(i) = true;
+				}
 			}
 
 			// process hash and probe
@@ -363,7 +349,7 @@ int main(void) {
 
 				// build hashmap for smaller column
 				map<size_t, vector<size_t>> hashmap;
-				o_orderkey->buildHashmap(hashmap);
+				o_orderkey->buildHashmap(hashmap, o_rowIds);
 
 				// probe (join) to find matching row ids
 				for (size_t rowId = 0; rowId < l_orderkey->vecValueSize(); rowId++) {
@@ -399,7 +385,7 @@ int main(void) {
 
 				// build hashmap for smaller column
 				map<size_t, vector<size_t>> hashmap;
-				l_orderkey->buildHashmap(hashmap);
+				l_orderkey->buildHashmap(hashmap, l_rowIds);
 
 				// probe (join) to find matching row ids
 				for (size_t rowId = 0; rowId < o_orderkey->vecValueSize(); rowId++) {
@@ -446,6 +432,10 @@ int main(void) {
 					vector<int> tmpOut = t->projection(o_rowIds, limit, limitCount);
 					for (size_t i = 0; i < tmpOut.size(); i++) {
 						outputs[i+1] += to_string(tmpOut[i]) + ",   ";
+						// padding whitespace
+						for (int j = 11 - (outputs[i+1].length()); j > 0; j--) {
+							outputs[i+1] += " ";
+						}
 					}
 				}
 				else {
@@ -657,6 +647,10 @@ int main(void) {
 						vector<int> tmpOut = t->projection(q_resultRid, limit, limitCount);
 						for (size_t i = 0; i < tmpOut.size(); i++) {
 							outputs[i+1] += to_string(tmpOut[i]) + ",   ";
+							// padding whitespace
+							for (int j = 11 - (outputs[i+1].length()); j > 0; j--) {
+								outputs[i+1] += " ";
+							}
 						}
 					}
 					else {

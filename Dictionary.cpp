@@ -234,7 +234,7 @@ template<>
 void Dictionary<string>::buildInvertedIndex() {
 	// make an unordered_map of words from all items
 	vector<string>* strItems = (vector<string>*) items;
-	unordered_map<string, vector<size_t>> mapWords;
+	//unordered_map<string, vector<size_t>> mapWords;
 	unordered_map<string, vector<size_t>> mapWordsLevel0;
 	for (size_t i = 0; i < strItems->size(); i++) {
 		// split item into word by whitespace
@@ -245,16 +245,16 @@ void Dictionary<string>::buildInvertedIndex() {
 		for (size_t j = 0; j < words.size(); j++) {
 			// map key = word + position in text
 			string key = words[j] + "#" + to_string(j);
-			vector<size_t> location = mapWords[key];
+			//vector<size_t> location = mapWords[key];
 			vector<size_t> locationLevel0 = mapWordsLevel0[words[j]];
-			location.push_back(i); // text position
+			//location.push_back(i); // text position
 			locationLevel0.push_back(i);
-			mapWords[key] = location;
+			//mapWords[key] = location;
 			mapWordsLevel0[words[j]] = locationLevel0;
 		}
 	}
 	// create vector of inverted index from map
-	for (const auto& m : mapWords) {
+	/*for (const auto& m : mapWords) {
 		string key = m.first;
 		vector<size_t> location = m.second;
 		size_t findPos = key.find('#');
@@ -267,7 +267,7 @@ void Dictionary<string>::buildInvertedIndex() {
 		idx.position = position;
 		idx.location = location;
 		vecInvertedIndex->push_back(idx);
-	}
+	}*/
 	// create vector of inverted index level 0 from map
 	for (const auto& m : mapWordsLevel0) {
 		string word = m.first;
@@ -280,7 +280,7 @@ void Dictionary<string>::buildInvertedIndex() {
 		vecIndexLevel0->push_back(idxLevel0);
 	}
 	// sort vector of inverted index
-	std::sort(vecInvertedIndex->begin(), vecInvertedIndex->end());
+	//std::sort(vecInvertedIndex->begin(), vecInvertedIndex->end());
 	std::sort(vecIndexLevel0->begin(), vecIndexLevel0->end());
 	//for (size_t i = 0; i < vecInvertedIndex->size(); i++)
 	//cout << "Phan tu " << i << " = " << (vecInvertedIndex->at(i)).word << "," << to_string((vecInvertedIndex->at(i)).position) << endl;

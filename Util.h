@@ -6,6 +6,10 @@
  *      Description: Utilities functions
  */
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <vector>
+
 #ifndef UTIL_H_
 #define UTIL_H_
 
