@@ -58,7 +58,7 @@ std::ostream& operator<<(std::ostream& out, const ColumnBase::COLUMN_TYPE value)
     return out << s;
 }
 
-int main(void) {
+int main_test(void) {
 	puts("***** Simple Column-Store Database start ******");
 
 	string createQuery = "create table orders (o_orderkey integer, o_orderstatus text, o_totalprice integer, o_comment text)";
