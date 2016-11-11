@@ -25,6 +25,8 @@
 #include "Table.h"
 #include "SQLParser.h"
 #include "Util.h"
+#include "TestCpp.h"
+#include "Transaction.h"
 
 using namespace std;
 
@@ -57,6 +59,235 @@ std::ostream& operator<<(std::ostream& out, const ColumnBase::COLUMN_TYPE value)
 #undef PROCESS_VAL
     return out << s;
 }
+
+Table* createTable(string createQuery) {
+	hsql::SQLParserResult* pCreateQuery = hsql::SQLParser::parseSQLString(createQuery);
+	string tableName;
+	vector<string> cColumnName;
+	vector<ColumnBase::COLUMN_TYPE> cColumnType;
+	if (pCreateQuery->isValid) {
+		hsql::SQLStatement* stmt = pCreateQuery->getStatement(0);
+		if (stmt->type() == hsql::StatementType::kStmtCreate) {
+			hsql::CreateStatement* createStmt = (hsql::CreateStatement*) stmt;
+			tableName = createStmt->tableName;
+			vector<hsql::ColumnDefinition*>* cols = createStmt->columns;
+			for (hsql::ColumnDefinition* colDef : *cols) {
+				cColumnName.push_back(colDef->name);
+				switch (colDef->type) {
+					case hsql::ColumnDefinition::INT:
+					case hsql::ColumnDefinition::DOUBLE:
+						cColumnType.push_back(ColumnBase::intType);
+						break;
+					case hsql::ColumnDefinition::TEXT:
+						cColumnType.push_back(ColumnBase::charType);
+						break;
+				}
+			}
+		}
+	}
+	else {
+		cout << "Create table statement is Invalid !" << endl;
+		return NULL;
+	}
+	cout << "tablename: " << tableName << endl;
+	// init table
+	vector<ColumnBase*> columns;
+	Table* table = new Table(columns);
+	table->setName(tableName);
+	// init column
+	for (size_t i = 0; i < cColumnName.size(); i++) {
+		string name = cColumnName[i];
+		ColumnBase::COLUMN_TYPE type = cColumnType[i];
+		//cout << "colname: " << name << endl;
+		//cout << "col type: " << type << endl;
+		// create new column
+		ColumnBase* colBase = new ColumnBase();
+		if (type == ColumnBase::intType) {
+			Column<int>* col = new Column<int>();
+			colBase = col;
+		}
+		else {
+			Column<string>* col = new Column<string>();
+			colBase = col;
+		}
+		colBase->setName(name);
+		colBase->setType(type);
+		//if (name == "o_orderkey") colBase->setPrimaryKey(true);
+		//if (name == "o_comment") colBase->setCreateInvertedIndex(true);
+		columns.push_back(colBase);
+	}
+
+	// calculate time execution
+	clock_t begin_time = clock();
+
+	// read file
+	cout << "Enter table source file path: ";
+	string filePath;
+	getline(cin, filePath);
+	ifstream infile(filePath);
+	//ifstream infile("/home/duclv/homework/data1M.csv");
+	string line;
+	string delim = ",";
+	int row = 0;
+	while(getline(infile, line)) {
+		size_t last = 0; size_t next = 0;
+		char idx = 0;
+		vector<string> items;	// split items
+		string lastItem;
+		string token;
+		while ((next = line.find(delim, last)) != string::npos) {
+			token = line.substr(last, next - last);
+			last = next + delim.length();
+			if (idx >= table->numOfColumns() - 1)
+				lastItem += token + delim;
+			else
+				items.push_back(token);
+			++idx;
+		}
+		// get the last token and add to last item
+		token = line.substr(last);
+		lastItem += token;
+		items.push_back(lastItem);
+
+		// process input data based on column type
+		for (int i = 0; i < table->numOfColumns(); i++) {
+			string item = items[i];
+			ColumnBase* colBase = columns[i];
+			if (colBase->getType() == ColumnBase::intType) {
+				int intValue = stoi(item);
+				bool sorted = true;
+				// update dictionary
+				Column<int>* col = (Column<int>*) colBase;
+				col->updateDictionary(intValue, sorted);
+			}
+			else {
+				// char or varchar type
+				boost::replace_all(item, "\"", "");
+				bool sorted = false;
+				// update dictionary
+				Column<string>* col = (Column<string>*) colBase;
+				col->updateDictionary(item, sorted);
+			}
+		}
+		++row;
+	}
+	infile.close();
+	// print distinct numbers
+	for (ColumnBase* colBase : columns) {
+		if (colBase->getType() == ColumnBase::intType) {
+			Column<int>* col = (Column<int>*) colBase;
+			cout << col->getName() << " #distinct values = " << col->getDictionary()->size()<<"/"<<row << endl;
+		}
+		else {
+			Column<string>* col = (Column<string>*) colBase;
+			cout << col->getName() << " #distinct values = " << col->getDictionary()->size()<<"/"<<row << endl;
+		}
+	}
+
+	// process columns of table
+	table->processColumn();
+
+	// loaded time
+	cout << "Table Load time: " << float( clock () - begin_time ) /  CLOCKS_PER_SEC << " seconds " << endl;
+
+	return table;
+};
+
+// UPDATE
+bool updateCommand(Table &table, vector<string> command) {
+	if (command.size() < 2) {
+		cout << "ERROR: No row id field !" << endl;
+		return false;
+	}
+	size_t rid = (size_t) stoi(command[1]);
+	if (rid < 0 || rid > table.numOfRows()) {
+		cout << "ERROR: row id is not in range of table !" << endl;
+		return false;
+	}
+	// update value init
+	int o_orderkey = -1;
+	string o_orderstatus = "";
+	int o_totalprice = -1;
+	string o_comment = "";
+	// create Transaction
+	Transaction transaction;
+	size_t txIdx = transaction.createTx();
+	// get update value from command and execute update
+	transaction.startTx(txIdx);
+	uint64_t csn = transaction.getTimestampAsCSN();
+	if (command.size() >= 3) {
+		o_orderkey = stoi(command[3-1]);
+		Column<int>* col = (Column<int>*) table.getColumnByName("o_orderkey");
+		col->addVersionVecValue(o_orderkey, csn, rid);
+	}
+	if (command.size() >= 4) {
+		o_orderstatus = command[4-1];
+		Column<string>* col = (Column<string>*) table.getColumnByName("o_orderstatus");
+		col->addVersionVecValue(o_orderstatus, csn, rid);
+	}
+	if (command.size() >= 5) {
+		o_totalprice = stoi(command[5-1]);
+		Column<int>* col = (Column<int>*) table.getColumnByName("o_totalprice");
+		col->addVersionVecValue(o_totalprice, csn, rid);
+	}
+	if (command.size() >= 6) {
+		o_comment = command[6-1];
+		Column<string>* col = (Column<string>*) table.getColumnByName("o_comment");
+		col->addVersionVecValue(o_comment, csn, rid);
+	}
+	// commit Transaction
+	transaction.commitTx(txIdx, csn);
+
+	return true;
+}
+
+// INSERT
+bool insertCommand(Table &table, vector<string> command) {
+	if (command.size() < 5) {
+		cout << "ERROR: Not enough 4 fields to INSERT !" << endl;
+		return false;
+	}
+	// insert value init
+	int o_orderkey = -1;
+	string o_orderstatus = "";
+	int o_totalprice = -1;
+	string o_comment = "";
+	// create Transaction
+	Transaction transaction;
+	size_t txIdx = transaction.createTx();
+	// get insert value from command and execute insert
+	transaction.startTx(txIdx);
+	uint64_t csn = transaction.getTimestampAsCSN();
+	if (command.size() >= 2) {
+		o_orderkey = stoi(command[2-1]);
+		Column<int>* col = (Column<int>*) table.getColumnByName("o_orderkey");
+		col->insertDataVecValue(o_orderkey, csn);
+	}
+	if (command.size() >= 3) {
+		o_orderstatus = command[3-1];
+		Column<string>* col = (Column<string>*) table.getColumnByName("o_orderstatus");
+		col->insertDataVecValue(o_orderstatus, csn);
+	}
+	if (command.size() >= 4) {
+		o_totalprice = stoi(command[4-1]);
+		Column<int>* col = (Column<int>*) table.getColumnByName("o_totalprice");
+		col->insertDataVecValue(o_totalprice, csn);
+	}
+	if (command.size() >= 5) {
+		o_comment = command[5-1];
+		Column<string>* col = (Column<string>*) table.getColumnByName("o_comment");
+		col->insertDataVecValue(o_comment, csn);
+	}
+	// commit Transaction
+	transaction.commitTx(txIdx, csn);
+	return true;
+}
+
+// SCAN
+string scanCommand(Table &table, vector<string> command) {
+	return "";
+}
+
 
 int main_test(void) {
 	puts("***** Simple Column-Store Database start ******");
@@ -115,7 +346,7 @@ int main_test(void) {
 		}
 		colBase->setName(name);
 		colBase->setType(type);
-		if (name == "o_orderkey") colBase->setPrimaryKey(true);
+		//if (name == "o_orderkey") colBase->setPrimaryKey(true);
 		//if (name == "o_comment") colBase->setCreateInvertedIndex(true);
 		columns.push_back(colBase);
 	}

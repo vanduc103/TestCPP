@@ -23,6 +23,9 @@ private:
 	string name;
 public:
 	virtual ~Table() {
+		for (ColumnBase* column : (*m_columns)) {
+			delete column;
+		}
 		delete m_columns;
 	}
 
@@ -43,6 +46,10 @@ public:
 
 	int numOfColumns() {
 		return (int) m_columns->size();
+	}
+
+	size_t numOfRows() {
+		return ((Column<int>*) m_columns->at(0))->vecValueSize();
 	}
 
 	ColumnBase* getColumnByName(string colName) {
@@ -79,6 +86,7 @@ public:
 			}
 		}
 	}
+
 };
 
 } /* namespace std */

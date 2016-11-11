@@ -33,16 +33,45 @@ private:
 	Dictionary<T>* dictionary;
 	// bulk insert ?
 	bool bulkInsert = false;
+
+	// DATA SPACE
+	struct data_column {
+		bool versionFlag;
+		size_t encodedValue;
+		uint64_t csn;
+	};
+	vector<data_column>* dataColumn;
+
+	// VERSION SPACE
+	vector<size_t>* versionVecValue;
+	struct version_column {
+		size_t encodedValue;
+		uint64_t csn;
+		version_column* next;
+	};
+	vector<version_column>* versionColumn;
+	Dictionary<T>* deltaSpace;
+	map<size_t, size_t>* hashtable;
 public:
 	Column() {
 		dictionary = new Dictionary<T>();
 		vecValue = new vector<size_t>();
 		packed = new PackedArray();
+		dataColumn = new vector<data_column>();
+		versionVecValue = new vector<size_t>();
+		versionColumn = new vector<version_column>();
+		deltaSpace = new Dictionary<T>();
+		hashtable = new map<size_t, size_t>();
 	}
 	virtual ~Column() {
 		delete vecValue;
 		delete dictionary;
 		PackedArray_destroy(packed);
+		delete dataColumn;
+		delete versionVecValue;
+		delete versionColumn;
+		delete deltaSpace;
+		delete hashtable;
 	}
 
 	vector<size_t>* getVecValue() {
@@ -88,6 +117,17 @@ public:
 		}
 		// free vecValue
 		vecValue->resize(0);
+	}
+
+	vector<size_t>* unpackingVecValue() {
+		if (vecValue == NULL) {
+			vecValue = new vector<size_t>();
+		}
+		vecValue->clear();
+		for (int i = 0; i < packed->count; i++) {
+			vecValue->push_back(PackedArray_get(packed, i));
+		}
+		return vecValue;
 	}
 
 	void updateVecValue(T& value) {
@@ -141,7 +181,7 @@ public:
 		this->getDictionary()->search(searchValue, q_where_op, result);
 
 		// find rowId with appropriate dictionary position
-		for (size_t rowId = 0; !result.empty() && rowId < this->vecValueSize(); rowId++) {
+		for (size_t rowId = 0; rowId < this->vecValueSize(); rowId++) {
 			size_t dictPosition = this->vecValueAt(rowId);
 			if ((q_where_op != ColumnBase::containOp && dictPosition >= result.front() && dictPosition <= result.back())
 				|| (q_where_op == ColumnBase::containOp && binary_search(result.begin(), result.end(), dictPosition))) {
@@ -204,6 +244,79 @@ public:
 			}
 		}
 		return vector<size_t>();
+	}
+
+	// DATA SPACE
+	void insertDataVecValue(T&value, uint64_t csn) {
+		// uncompress vecValue vector from bit packing
+		vecValue = unpackingVecValue();
+		// check if value existed on dictionary or not
+		vector<size_t> result;
+		dictionary->search(value, ColumnBase::OP_TYPE::equalOp, result);
+		// not existed -> create new entry on delta space
+		size_t dictPos = result.at(0);
+		if (dictPos == -1) {
+			// add value to delta space and vecValue (start from last dictionary position)
+			dictPos = deltaSpace->addNewElementInDeltaSpace(value, vecValue, dictionary->size());
+		}
+		else {
+			// append inserted value to vecValue
+			vecValue->push_back(dictPos);
+		}
+		// encoded value is index in vecValue
+		size_t encodedValue = vecValue->size() - 1;
+		// bit packing vecValue again
+		bitPackingVecValue();
+		// create new data space value
+		data_column newData;
+		newData.encodedValue = encodedValue;
+		newData.csn = csn;
+		newData.versionFlag = false;
+		dataColumn->push_back(newData);
+	}
+
+	// VERSION SPACE
+	void addVersionVecValue(T& value, uint64_t csn, size_t rid) {
+		// check if value existed on dictionary or not
+		vector<size_t> result;
+		dictionary->search(value, ColumnBase::OP_TYPE::equalOp, result);
+		// not existed -> create new entry on delta space
+		size_t dictPos = result.at(0);
+		if (dictPos == -1) {
+			// add to delta space and version vector (start from last dictionary position)
+			dictPos = deltaSpace->addNewElementInDeltaSpace(value, versionVecValue, dictionary->size());
+		}
+		else {
+			// append inserted value to version vecValue
+			versionVecValue->push_back(dictPos);
+		}
+		// encoded value is index in vecValue
+		size_t encodedValue = vecValue->size() - 1;
+		// create new version
+		version_column newVersion;
+		newVersion.encodedValue = encodedValue;
+		newVersion.next = NULL;
+		newVersion.csn = csn;
+		// check previous version on hash table
+		size_t preVersionIdx = -1;
+		try {
+			preVersionIdx = hashtable->at(rid);
+		} catch (exception& e) {
+			// not existed on hashtable, keep -1
+		}
+		if (preVersionIdx >= 0) {
+			version_column preVersion = versionColumn->at(preVersionIdx);
+			// point the next pointer of new created version to previous version
+			newVersion.next = &preVersion;
+			// replace the previous version on Version space vector by new version
+			versionColumn->at(preVersionIdx) = newVersion;
+		}
+		else {
+			// add new version to Version space vector
+			versionColumn->push_back(newVersion);
+			// create a new entry for rid on Hash table
+			(*hashtable)[rid] = versionColumn->size() - 1;
+		}
 	}
 };
 

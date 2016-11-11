@@ -6,24 +6,27 @@
 #include <sstream>
 #include <fstream>
 
+using namespace std;
+
 int main(int argc, char* argv[]) {
     try {
         // Create the Socket
         ClientSocket c_socket("localhost", 30000);
-        std::string line;
+        std::string command;
         std::string reply;
 
-        std::ifstream in("orders_sample.tbl");
+        //std::ifstream in("orders_sample.tbl");
         std::ofstream out("client.log");
 
-        while(!in.eof()) {
-            getline(in, line);
-            if(line != "") {
+        while(true) {
+        	cout << "Client command: ";
+            getline(cin, command);
+            if(command != "") {
                 try {
-                    std::string message = "INSERT|" + line;
-                    out << "[Sending]\t" + message + "\n";
-                    std::cout << "[Sending]\t" + message + "\n";
-                    c_socket << message;
+                    //std::string message = "INSERT|" + line;
+                    out << "[Sending]\t" + command + "\n";
+                    std::cout << "[Sending]\t" + command + "\n";
+                    c_socket << command;
                     c_socket >> reply;
                 } catch (SocketException&) {}
                 out << "[Response]\t" << reply << "\n";

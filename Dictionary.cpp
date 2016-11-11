@@ -175,7 +175,7 @@ size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue, bool sor
 		if (bulkInsert)
 			bulkVecValue->push_back(value);
 		vecValue->push_back(0);
-		(*sMap)[value] = 1;
+		if (!sorted) (*sMap)[value] = 1;
 		return 0;
 	} else if (!sorted) {
 		// check if value existed on dictionary
@@ -226,6 +226,50 @@ size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue, bool sor
 
 			// return the position of new element
 			return newElementPos;
+		}
+	}
+}
+
+template<class T>
+size_t Dictionary<T>::addNewElementInDeltaSpace(T& value, vector<size_t>* vecValue, size_t startPos) {
+	if (items->empty()) {
+		items->push_back(value);
+		vecValue->push_back(0 + startPos);
+		return 0 + startPos;
+	} else {
+		// find the lower bound for value in vector
+		typename vector<T>::iterator lower;
+		lower = std::lower_bound(items->begin(), items->end(), value,
+				compFunc<T>);
+		// value existed
+		if (lower != items->end() && equalFunc(value, *lower)) {
+			// return the position of lower
+			long elementPos = lower - items->begin();
+			vecValue->push_back(elementPos + startPos);
+			return elementPos + startPos;
+		} else {
+			// The position of new element in dictionary
+			size_t newElementPos = 0L;
+			if (lower == items->end()) {
+				// insert to the end of dictionary
+				newElementPos = items->size();
+				items->push_back(value);
+				vecValue->push_back(newElementPos + startPos);
+			} else {
+				newElementPos = lower - items->begin();
+				// insert into dictionary
+				items->insert(lower, value);
+				// update (+1) to all elements in vecValue have value >= newElementPos
+				for (int i = 0; i < vecValue->size(); i++) {
+					if (vecValue->at(i) >= newElementPos + startPos) {
+						++vecValue->at(i);
+					}
+				}
+				vecValue->push_back(newElementPos + startPos);
+			}
+
+			// return the position of new element
+			return newElementPos + startPos;
 		}
 	}
 }
