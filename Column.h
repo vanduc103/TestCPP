@@ -250,21 +250,8 @@ public:
 	void insertDataVecValue(T&value, uint64_t csn) {
 		// uncompress vecValue vector from bit packing
 		vecValue = unpackingVecValue();
-		// check if value existed on dictionary or not
-		vector<size_t> result;
-		dictionary->search(value, ColumnBase::OP_TYPE::equalOp, result);
-		// not existed -> create new entry on delta space
-		size_t dictPos = result.at(0);
-		if (dictPos == -1) {
-			// add value to delta space and vecValue (start from last dictionary position)
-			dictPos = deltaSpace->addNewElementInDeltaSpace(value, vecValue, dictionary->size());
-		}
-		else {
-			// append inserted value to vecValue
-			vecValue->push_back(dictPos);
-		}
-		// encoded value is index in vecValue
-		size_t encodedValue = vecValue->size() - 1;
+		// add new value to dictionary
+		size_t encodedValue = dictionary->addNewElement(value, vecValue, true, false);
 		// bit packing vecValue again
 		bitPackingVecValue();
 		// create new data space value
@@ -317,6 +304,10 @@ public:
 			// create a new entry for rid on Hash table
 			(*hashtable)[rid] = versionColumn->size() - 1;
 		}
+		// update version_flag on DATA space
+		data_column dataValue = dataColumn->at(rid);
+		dataValue.versionFlag = true;
+		dataColumn->at(rid) = dataValue;
 	}
 };
 

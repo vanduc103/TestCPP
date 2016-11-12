@@ -40,6 +40,15 @@ public:
 
 	bool isCreateInvertedIndex() {return createInvertedIndex; }
 	void setCreateInvertedIndex(bool createInvertedIndex) {this->createInvertedIndex = createInvertedIndex; }
+
+	static OP_TYPE sToOp(string op) {
+		if (op == ">") return OP_TYPE::gtOp;
+		else if (op == ">=") return OP_TYPE::geOp;
+		else if (op == "<") return OP_TYPE::ltOp;
+		else if (op == "<=") return OP_TYPE::leOp;
+		else if (op == "=") return OP_TYPE::equalOp;
+		else if (op == "<>") return OP_TYPE::neOp;
+	}
 };
 
 } /* namespace std */

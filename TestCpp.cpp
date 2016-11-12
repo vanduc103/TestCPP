@@ -285,6 +285,20 @@ bool insertCommand(Table &table, vector<string> command) {
 
 // SCAN
 string scanCommand(Table &table, vector<string> command) {
+	if (command.size() < 4) {
+		cout << "SCAN command must have at least 4 fields !" << cout << endl;
+		return false;
+	}
+	string filterValue1 = command[1];
+	string column1 = command[2];
+	string operator1 = command[3];
+	// scan with filter value 1
+	ColumnBase* colBase = table.getColumnByName(column1);
+	if (colBase->getType() == ColumnBase::intType) {
+		Column<int>* col = (Column<int>*) colBase;
+		int searchValue = stoi(filterValue1);
+		col->selection(searchValue, ColumnBase::sToOp(operator1), q_resultRid, initQueryResult)
+	}
 	return "";
 }
 
@@ -821,8 +835,10 @@ int main_test(void) {
 						cout << "where values[" << i << "] = " << q_where_values[i] << endl;
 					}
 				}
-				// execute query
+				// init query result row id
 				vector<bool>* q_resultRid = new vector<bool>(); // contain query result row id
+				for (size_t i = 0; i < table)
+				// execute query
 				vector<vector<size_t>> q_results;
 				for (size_t fidx = 0; fidx < q_where_fields.size(); fidx++) {
 					string q_where_field = q_where_fields[fidx];
