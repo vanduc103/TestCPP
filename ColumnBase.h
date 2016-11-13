@@ -48,6 +48,7 @@ public:
 		else if (op == "<=") return OP_TYPE::leOp;
 		else if (op == "=") return OP_TYPE::equalOp;
 		else if (op == "<>") return OP_TYPE::neOp;
+		return OP_TYPE::containOp;
 	}
 };
 

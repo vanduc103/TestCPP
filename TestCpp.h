@@ -15,8 +15,8 @@
 using namespace std;
 
 Table* createTable(string createQuery);
-bool updateCommand(Table &table, vector<string> command);
-bool insertCommand(Table &table, vector<string> command);
+string updateCommand(Table &table, vector<string> command);
+string insertCommand(Table &table, vector<string> command);
 string scanCommand(Table &table, vector<string> command);
 
 #endif /* TESTCPP_H_ */

@@ -21,11 +21,12 @@ public:
 		uint64_t csn;		// commit squence number
 		uint64_t startTs;	// start time stamp
 		TRANSACTION_STATUS status;
+		vector<size_t> vecRid;			// list of row id this transaction use
 	};
 	static vector<transaction>* vecTransaction;
+	static vector<size_t>* vecActiveTransaction;
 
 private:
-
 
 
 public:
@@ -33,13 +34,13 @@ public:
 	virtual ~Transaction();
 
 	size_t createTx();
-
 	void startTx(size_t txIdx);
-
+	void updateRid2Transaction(size_t txIdx, vector<size_t> vecRid);
+	uint64_t getStartTimestamp(size_t txIdx);
 	uint64_t getTimestampAsCSN();
 	void commitTx(size_t txIdx, uint64_t csn);
-
 	void abortTx(size_t txIdx);
+	vector<transaction>* listActiveTransaction();
 };
 
 } /* namespace std */

@@ -72,7 +72,22 @@ int Socket::recv(std::string& s) const {
 
     memset(buf, 0, MAXRECV + 1);
 
-    int status = ::recv(m_sock, buf, MAXRECV, 0);
+    // Client receive byte array from server
+    int bytesReceived = 0;
+    do {
+    	bytesReceived = ::recv(m_sock, buf, MAXRECV, 0);
+        // append string from buffer.
+        if ( bytesReceived == -1 ) {
+        	std::cout << "status == -1\terrno == " << errno << " in Socket::recv" << std::endl;
+        	return 0;
+        } else {
+            s.append( buf );
+        }
+    } while ( bytesReceived == MAXRECV );
+
+    return bytesReceived;
+
+    /*int status = ::recv(m_sock, buf, MAXRECV, 0);
 
     if(status == -1) {
         std::cout << "status == -1\terrno == " << errno << " in Socket::recv" << std::endl;
@@ -82,7 +97,7 @@ int Socket::recv(std::string& s) const {
     } else {
         s = buf;
         return status;
-    }
+    }*/
 }
 
 bool Socket::connect(const std::string host, const int port) {

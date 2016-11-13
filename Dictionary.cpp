@@ -54,6 +54,12 @@ T* Dictionary<T>::lookup(size_t index) {
 
 template<class T>
 void Dictionary<T>::search(T& value, ColumnBase::OP_TYPE opType, vector<size_t>& result) {
+	if (sorted) searchWithSorted(value, opType, result);
+	else searchWithNoSorted(value, opType, result);
+}
+
+template<class T>
+void Dictionary<T>::searchWithSorted(T& value, ColumnBase::OP_TYPE opType, vector<size_t>& result) {
 	if (items->empty()) {
 		// return -1 to show no result
 		result.push_back(-1);
@@ -167,21 +173,107 @@ void Dictionary<T>::search(T& value, ColumnBase::OP_TYPE opType, vector<size_t>&
 	}
 }
 
+template<class T>
+void Dictionary<T>::searchWithNoSorted(T& value, ColumnBase::OP_TYPE opType, vector<size_t>& result) {
+	if (items->empty()) {
+		// return -1 to show no result
+		result.push_back(-1);
+	} else {
+		// Search with no sorted dictionary => scan through all items
+		for (size_t i = 0; i < items->size(); i++) {
+			T dictionaryValue = items->at(i);
+			// based on operator to find exact position in dictionary
+			switch (opType) {
+			case ColumnBase::equalOp: {
+				// equal
+				if (equalFunc(dictionaryValue, value)) {
+					result.push_back(i);
+				} else {
+					// return -1 to show no result
+					result.push_back(-1);
+				}
+				// return result because dictionary is no duplicate values
+				return;
+			}
+			case ColumnBase::neOp: {
+				// not equal
+				if (!equalFunc(value, dictionaryValue)) {
+					result.push_back(i);
+				}
+				break;
+			}
+			case ColumnBase::ltOp: {
+				// less than
+				if (compFunc(dictionaryValue, value)){
+					result.push_back(i);
+				}
+				break;
+			}
+			case ColumnBase::leOp: {
+				// less than or equal = not greater than
+				if (!compFunc(value, dictionaryValue)) {
+					result.push_back(i);
+				}
+				break;
+			}
+			case ColumnBase::gtOp: {
+				// greater than
+				if (compFunc(value, dictionaryValue)){
+					result.push_back(i);
+				}
+				break;
+			}
+			case ColumnBase::geOp: {
+				// greater than or equal = not less than
+				if (!compFunc(dictionaryValue, value)) {
+					result.push_back(i);
+				}
+				break;
+			}
+			case ColumnBase::containOp: {
+				// search by inverted index
+				struct invertedIndex idxContain;
+				strTolower(value);	// to lower to compare with index
+				idxContain.word = value;
+				typename vector<invertedIndex>::iterator lowerIdx;
+				lowerIdx = std::lower_bound(vecIndexLevel0->begin(), vecIndexLevel0->end(),
+						idxContain);
+				// found
+				if (lowerIdx != vecIndexLevel0->end() && *lowerIdx == idxContain) {
+					invertedIndex idx = vecIndexLevel0->at(lowerIdx - vecIndexLevel0->begin());
+					result.insert(result.end(), idx.location.begin(), idx.location.end());
+					// sort result
+					std::sort(result.begin(), result.end());
+				}
+				/*for (size_t i = 0; i < vecInvertedIndex->size(); i++) {
+					invertedIndex idx = vecInvertedIndex->at(i);
+					if (equalFunc(idx.word, value)) {
+						result.insert(result.end(), idx.location.begin(), idx.location.end());
+						// sort result
+						std::sort(result.begin(), result.end());
+					}
+				}*/
+				break;
+			}
+			}
+		}
+	}
+}
 
 template<class T>
-size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue, bool sorted, bool bulkInsert) {
+size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue, bool sorted, bool bulkInsert, size_t startPos) {
 	if (items->empty()) {
 		items->push_back(value);
 		if (bulkInsert)
 			bulkVecValue->push_back(value);
-		vecValue->push_back(0);
+		vecValue->push_back(0 + startPos);
 		if (!sorted) (*sMap)[value] = 1;
 		return 0;
 	} else if (!sorted) {
 		// check if value existed on dictionary
 		if ((*sMap)[value] == 0) {
 			items->push_back(value);
-			vecValue->push_back(items->size() - 1);
+			vecValue->push_back(items->size() - 1 + startPos);
 			(*sMap)[value] = vecValue->back() + 1;
 		}
 		else {
@@ -195,52 +287,6 @@ size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue, bool sor
 				compFunc<T>);
 		if (bulkInsert)
 			bulkVecValue->push_back(value);
-		// value existed
-		if (lower != items->end() && equalFunc(value, *lower)) {
-			// return the position of lower
-			long elementPos = lower - items->begin();
-			vecValue->push_back(elementPos);
-			return elementPos;
-		} else {
-			// The position of new element in dictionary
-			size_t newElementPos = 0L;
-			if (lower == items->end()) {
-				// insert to the end of dictionary
-				newElementPos = items->size();
-				items->push_back(value);
-				vecValue->push_back(newElementPos);
-			} else {
-				newElementPos = lower - items->begin();
-				// insert into dictionary
-				items->insert(lower, value);
-				// update (+1) to all elements in vecValue have value >= newElementPos
-				if (!bulkInsert) {
-					for (int i = 0; i < vecValue->size(); i++) {
-						if (vecValue->at(i) >= newElementPos) {
-							++vecValue->at(i);
-						}
-					}
-				}
-				vecValue->push_back(newElementPos);
-			}
-
-			// return the position of new element
-			return newElementPos;
-		}
-	}
-}
-
-template<class T>
-size_t Dictionary<T>::addNewElementInDeltaSpace(T& value, vector<size_t>* vecValue, size_t startPos) {
-	if (items->empty()) {
-		items->push_back(value);
-		vecValue->push_back(0 + startPos);
-		return 0 + startPos;
-	} else {
-		// find the lower bound for value in vector
-		typename vector<T>::iterator lower;
-		lower = std::lower_bound(items->begin(), items->end(), value,
-				compFunc<T>);
 		// value existed
 		if (lower != items->end() && equalFunc(value, *lower)) {
 			// return the position of lower
@@ -260,9 +306,11 @@ size_t Dictionary<T>::addNewElementInDeltaSpace(T& value, vector<size_t>* vecVal
 				// insert into dictionary
 				items->insert(lower, value);
 				// update (+1) to all elements in vecValue have value >= newElementPos
-				for (int i = 0; i < vecValue->size(); i++) {
-					if (vecValue->at(i) >= newElementPos + startPos) {
-						++vecValue->at(i);
+				if (!bulkInsert) {
+					for (int i = 0; i < vecValue->size(); i++) {
+						if (vecValue->at(i) >= newElementPos + startPos) {
+							++vecValue->at(i);
+						}
 					}
 				}
 				vecValue->push_back(newElementPos + startPos);

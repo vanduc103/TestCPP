@@ -27,10 +27,11 @@ int main(int argc, char* argv[]) {
                     out << "[Sending]\t" + command + "\n";
                     std::cout << "[Sending]\t" + command + "\n";
                     c_socket << command;
+                    // receive reply from server
                     c_socket >> reply;
                 } catch (SocketException&) {}
                 out << "[Response]\t" << reply << "\n";
-                std::cout << "[Response]\t" << reply << "\n";
+                std::cout << "[Response]\t" << endl << reply << "\n";
             }
         }
     } catch(SocketException& e) {

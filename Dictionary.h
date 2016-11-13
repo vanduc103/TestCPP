@@ -38,6 +38,7 @@ private:
 	};
 
 	vector<T>* items;
+	bool sorted = true;
 	std::map<T, size_t, classcomp>* sMap;
 	vector<T>* bulkVecValue;
 	vector<invertedIndex>* vecInvertedIndex;
@@ -60,17 +61,20 @@ public:
 
 	T* lookup(size_t index);
 	void search(T& value, ColumnBase::OP_TYPE opType, vector<size_t>& result);
-	size_t addNewElement(T& value, vector<size_t>* vecValue, bool sorted, bool bulkInsert);
-	size_t addNewElementInDeltaSpace(T& value, vector<size_t>* vecValue, size_t startPos);
+	void searchWithSorted(T& value, ColumnBase::OP_TYPE opType, vector<size_t>& result);
+	void searchWithNoSorted(T& value, ColumnBase::OP_TYPE opType, vector<size_t>& result);
+	size_t addNewElement(T& value, vector<size_t>* vecValue, bool sorted, bool bulkInsert, size_t startPos = 0);
 	size_t size();
 	void print(int row);
+	void setSorted(bool sorted) {
+		this->sorted = sorted;
+	}
 
 	vector<T>* getBulkVecValue() {
 		return bulkVecValue;
 	}
 
 	void clearTemp() {
-		sMap->clear();
 		bulkVecValue->resize(0);
 	}
 

@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <map>
+#include <sstream>
 #include <boost/algorithm/string.hpp>
 
 #include "Dictionary.h"
@@ -89,17 +90,14 @@ Table* createTable(string createQuery) {
 		cout << "Create table statement is Invalid !" << endl;
 		return NULL;
 	}
-	cout << "tablename: " << tableName << endl;
 	// init table
-	vector<ColumnBase*> columns;
+	vector<ColumnBase*>* columns = new vector<ColumnBase*>();
 	Table* table = new Table(columns);
 	table->setName(tableName);
 	// init column
 	for (size_t i = 0; i < cColumnName.size(); i++) {
 		string name = cColumnName[i];
 		ColumnBase::COLUMN_TYPE type = cColumnType[i];
-		//cout << "colname: " << name << endl;
-		//cout << "col type: " << type << endl;
 		// create new column
 		ColumnBase* colBase = new ColumnBase();
 		if (type == ColumnBase::intType) {
@@ -114,18 +112,22 @@ Table* createTable(string createQuery) {
 		colBase->setType(type);
 		//if (name == "o_orderkey") colBase->setPrimaryKey(true);
 		//if (name == "o_comment") colBase->setCreateInvertedIndex(true);
-		columns.push_back(colBase);
+		columns->push_back(colBase);
 	}
 
 	// calculate time execution
 	clock_t begin_time = clock();
+	// create Transaction
+	Transaction transaction;
+	size_t txIdx = transaction.createTx();
+	transaction.startTx(txIdx);
+	uint64_t csn = transaction.getTimestampAsCSN();
 
 	// read file
 	cout << "Enter table source file path: ";
-	string filePath;
-	getline(cin, filePath);
+	string filePath = "/home/duclv/homework/data1M.csv";
+	//getline(cin, filePath);
 	ifstream infile(filePath);
-	//ifstream infile("/home/duclv/homework/data1M.csv");
 	string line;
 	string delim = ",";
 	int row = 0;
@@ -152,28 +154,28 @@ Table* createTable(string createQuery) {
 		// process input data based on column type
 		for (int i = 0; i < table->numOfColumns(); i++) {
 			string item = items[i];
-			ColumnBase* colBase = columns[i];
+			ColumnBase* colBase = columns->at(i);
 			if (colBase->getType() == ColumnBase::intType) {
 				int intValue = stoi(item);
-				bool sorted = true;
+				bool sorted = true; bool bulkInsert = true;
 				// update dictionary
 				Column<int>* col = (Column<int>*) colBase;
-				col->updateDictionary(intValue, sorted);
+				col->updateDictionary(intValue, sorted, bulkInsert, csn);
 			}
 			else {
 				// char or varchar type
 				boost::replace_all(item, "\"", "");
-				bool sorted = false;
+				bool sorted = false; bool bulkInsert = true;
 				// update dictionary
 				Column<string>* col = (Column<string>*) colBase;
-				col->updateDictionary(item, sorted);
+				col->updateDictionary(item, sorted, bulkInsert, csn);
 			}
 		}
 		++row;
 	}
 	infile.close();
 	// print distinct numbers
-	for (ColumnBase* colBase : columns) {
+	for (ColumnBase* colBase : (*columns)) {
 		if (colBase->getType() == ColumnBase::intType) {
 			Column<int>* col = (Column<int>*) colBase;
 			cout << col->getName() << " #distinct values = " << col->getDictionary()->size()<<"/"<<row << endl;
@@ -185,7 +187,7 @@ Table* createTable(string createQuery) {
 	}
 
 	// process columns of table
-	table->processColumn();
+	table->processColumn(csn);
 
 	// loaded time
 	cout << "Table Load time: " << float( clock () - begin_time ) /  CLOCKS_PER_SEC << " seconds " << endl;
@@ -194,16 +196,15 @@ Table* createTable(string createQuery) {
 };
 
 // UPDATE
-bool updateCommand(Table &table, vector<string> command) {
+string updateCommand(Table &table, vector<string> command) {
 	if (command.size() < 2) {
-		cout << "ERROR: No row id field !" << endl;
-		return false;
+		return "ERROR: No row id field !";
 	}
-	size_t rid = (size_t) stoi(command[1]);
-	if (rid < 0 || rid > table.numOfRows()) {
-		cout << "ERROR: row id is not in range of table !" << endl;
-		return false;
+	int test = stoi(command[1]);
+	if (test < 1) {
+		return "ERROR: row id must start from 1 !";
 	}
+	size_t rid = test - 1;	// rid start from 0
 	// update value init
 	int o_orderkey = -1;
 	string o_orderstatus = "";
@@ -218,34 +219,48 @@ bool updateCommand(Table &table, vector<string> command) {
 	if (command.size() >= 3) {
 		o_orderkey = stoi(command[3-1]);
 		Column<int>* col = (Column<int>*) table.getColumnByName("o_orderkey");
-		col->addVersionVecValue(o_orderkey, csn, rid);
+		if (col != NULL) {
+			if (col->numOfRows() <= rid) {
+				return "ERROR: row id excess number of rows !";
+			}
+			col->addVersionVecValue(o_orderkey, csn, rid);
+		}
 	}
 	if (command.size() >= 4) {
 		o_orderstatus = command[4-1];
 		Column<string>* col = (Column<string>*) table.getColumnByName("o_orderstatus");
+		if (col->numOfRows() <= rid) {
+			return "ERROR: row id excess number of rows !";
+		}
 		col->addVersionVecValue(o_orderstatus, csn, rid);
 	}
 	if (command.size() >= 5) {
 		o_totalprice = stoi(command[5-1]);
 		Column<int>* col = (Column<int>*) table.getColumnByName("o_totalprice");
+		if (col->numOfRows() <= rid) {
+			return "ERROR: row id excess number of rows !";
+		}
 		col->addVersionVecValue(o_totalprice, csn, rid);
 	}
 	if (command.size() >= 6) {
 		o_comment = command[6-1];
 		Column<string>* col = (Column<string>*) table.getColumnByName("o_comment");
+		if (col->numOfRows() <= rid) {
+			return "ERROR: row id excess number of rows !";
+		}
 		col->addVersionVecValue(o_comment, csn, rid);
 	}
 	// commit Transaction
 	transaction.commitTx(txIdx, csn);
 
-	return true;
+	return "Updated 1 row with rid = " + to_string(rid + 1);
 }
 
 // INSERT
-bool insertCommand(Table &table, vector<string> command) {
+string insertCommand(Table &table, vector<string> command) {
 	if (command.size() < 5) {
 		cout << "ERROR: Not enough 4 fields to INSERT !" << endl;
-		return false;
+		return "ERROR: Not enough 4 fields to INSERT !";
 	}
 	// insert value init
 	int o_orderkey = -1;
@@ -280,26 +295,99 @@ bool insertCommand(Table &table, vector<string> command) {
 	}
 	// commit Transaction
 	transaction.commitTx(txIdx, csn);
-	return true;
+	return "INSERTED 1 row !";
 }
 
 // SCAN
 string scanCommand(Table &table, vector<string> command) {
 	if (command.size() < 4) {
-		cout << "SCAN command must have at least 4 fields !" << cout << endl;
-		return false;
+		cout << "SCAN command must have at least 4 fields: SCAN|filter value|filter column|filter operator !" << endl;
+		return "SCAN command must have at least 4 fields: SCAN|filter value|filter column|filter operator !";
 	}
 	string filterValue1 = command[1];
 	string column1 = command[2];
 	string operator1 = command[3];
-	// scan with filter value 1
+
+	clock_t begin_time = clock();
+	// create Transaction
+	Transaction transaction;
+	size_t txIdx = transaction.createTx();
+	transaction.startTx(txIdx);
+	uint64_t txTs = transaction.getStartTimestamp(txIdx);
+	// select with filter value 1
+	vector<bool>* q_resultRid = new vector<bool>();
 	ColumnBase* colBase = table.getColumnByName(column1);
 	if (colBase->getType() == ColumnBase::intType) {
 		Column<int>* col = (Column<int>*) colBase;
 		int searchValue = stoi(filterValue1);
-		col->selection(searchValue, ColumnBase::sToOp(operator1), q_resultRid, initQueryResult)
+		col->selection(searchValue, ColumnBase::sToOp(operator1), q_resultRid);
 	}
-	return "";
+	else if (colBase->getType() == ColumnBase::charType) {
+		Column<string>* col = (Column<string>*) colBase;
+		string searchValue = filterValue1;
+		col->selection(searchValue, ColumnBase::sToOp(operator1), q_resultRid);
+	}
+	// scan all columns with version space
+	cout << "********* Print scan result ************" << endl;
+	size_t totalresult = 0;
+	for (size_t i = 0; i < q_resultRid->size(); i++) {
+		if (q_resultRid->at(i))
+			++totalresult;
+	}
+	size_t limit = 10;
+	size_t limitCount = 0;
+	vector<string> q_select_fields;
+	for (ColumnBase* colBase : *table.columns()) {
+		q_select_fields.push_back(colBase->getName());
+	}
+	vector<string> outputs (limit + 2);
+	for (size_t idx = 0; idx < q_select_fields.size(); idx++) {
+		string select_field_name = q_select_fields[idx];
+		outputs[0] += select_field_name + ", ";
+		ColumnBase* colBase = (ColumnBase*) table.getColumnByName(select_field_name);
+		if (colBase == NULL) continue;
+		if (colBase->getType() == ColumnBase::intType) {
+			Column<int>* t = (Column<int>*) colBase;
+			vector<int> tmpOut = t->projectionWithVersion(q_resultRid, txTs, limit, limitCount);
+			for (size_t i = 0; i < tmpOut.size(); i++) {
+				outputs[i+1] += to_string(tmpOut[i]) + ",   ";
+				// padding whitespace
+				for (int j = 11 - (outputs[i+1].length()); j > 0; j--) {
+					outputs[i+1] += " ";
+				}
+			}
+		}
+		else {
+			Column<string>* t = (Column<string>*) colBase;
+			vector<string> tmpOut = t->projectionWithVersion(q_resultRid, txTs, limit, limitCount);
+			for (size_t i = 0; i < tmpOut.size(); i++) {
+				outputs[i+1] += "\"" + tmpOut[i] + "\"" + ",   ";
+			}
+		}
+	}
+	// commit transaction
+	transaction.commitTx(txIdx, transaction.getTimestampAsCSN());
+	// show result
+	std::stringstream showing;
+	if (limitCount >= limit) {
+		showing << "Showing "<<limit << "/" << totalresult <<" results !";
+	}
+	else if (limitCount == 0) {
+		showing << "No result found !";
+	}
+	else {
+		showing << "Showing " << limitCount << "/" << totalresult <<" results !";
+	}
+	outputs.push_back(showing.str());
+	std::stringstream returnResult;
+	for (string output : outputs) {
+		if (!output.empty()) {
+			cout << output << endl;
+			returnResult << output << "\n";
+		}
+	}
+	std::cout << "Query time: " << float(clock() - begin_time)/CLOCKS_PER_SEC << " seconds " << endl;
+	return returnResult.str();
 }
 
 
@@ -339,7 +427,7 @@ int main_test(void) {
 	}
 	cout << "tablename: " << tableName << endl;
 	// init table
-	vector<ColumnBase*> columns;
+	vector<ColumnBase*>* columns = new vector<ColumnBase*>();
 	Table* table = new Table(columns);
 	table->setName(tableName);
 	// init column
@@ -362,7 +450,7 @@ int main_test(void) {
 		colBase->setType(type);
 		//if (name == "o_orderkey") colBase->setPrimaryKey(true);
 		//if (name == "o_comment") colBase->setCreateInvertedIndex(true);
-		columns.push_back(colBase);
+		columns->push_back(colBase);
 	}
 
 	// calculate time execution
@@ -400,7 +488,7 @@ int main_test(void) {
 		// process input data based on column type
 		for (int i = 0; i < table->numOfColumns(); i++) {
 			string item = items[i];
-			ColumnBase* colBase = columns[i];
+			ColumnBase* colBase = columns->at(i);
 			if (colBase->getType() == ColumnBase::intType) {
 				int intValue = stoi(item);
 				bool sorted = true;
@@ -421,7 +509,7 @@ int main_test(void) {
 	}
 	infile.close();
 	// print distinct numbers
-	for (ColumnBase* colBase : columns) {
+	for (ColumnBase* colBase : (*columns)) {
 		if (colBase->getType() == ColumnBase::intType) {
 			Column<int>* col = (Column<int>*) colBase;
 			cout << col->getName() << " #distinct values = " << col->getDictionary()->size()<<"/"<<row << endl;
@@ -448,7 +536,7 @@ int main_test(void) {
 	 */
 	begin_time = clock();
 	// init table 2
-	vector<ColumnBase*> columns2;
+	vector<ColumnBase*>* columns2 = new vector<ColumnBase*>();
 	Table* table2 = new Table(columns2);
 	table2->setName("lineitem");
 	cout << "table name: " << table2->getName() << endl;
@@ -515,9 +603,9 @@ int main_test(void) {
 	cout << col2->getName() << " #distinct values = " << col2->getDictionary()->size()<<"/"<<row << endl;
 
 	// add columns to table
-	columns2.push_back(col0);
-	columns2.push_back(col1);
-	columns2.push_back(col2);
+	columns2->push_back(col0);
+	columns2->push_back(col1);
+	columns2->push_back(col2);
 	table2->processColumn();
 
 	cout << "Table 2 Load time: " << float( clock () - begin_time ) /  CLOCKS_PER_SEC << " seconds " << endl;
@@ -539,13 +627,7 @@ int main_test(void) {
 
 			// initialize matching row ids
 			vector<bool>* l_rowIds = new vector<bool>();
-			for (size_t i = 0; i < l_orderkey->vecValueSize(); i++) {
-				l_rowIds->push_back(false);
-			}
 			vector<bool>* o_rowIds = new vector<bool>();
-			for (size_t i = 0;i < o_orderkey->vecValueSize(); i++) {
-				o_rowIds->push_back(false);
-			}
 
 			// join example 2: orders.o_totalprice < 56789 AND l_quantity > 40
 			if (query.find("2") != string::npos) {
@@ -837,7 +919,6 @@ int main_test(void) {
 				}
 				// init query result row id
 				vector<bool>* q_resultRid = new vector<bool>(); // contain query result row id
-				for (size_t i = 0; i < table)
 				// execute query
 				vector<vector<size_t>> q_results;
 				for (size_t fidx = 0; fidx < q_where_fields.size(); fidx++) {
@@ -859,8 +940,7 @@ int main_test(void) {
 								cerr << "Exception: " << e.what() << endl;
 								break;
 							}
-							bool initQueryResult = (fidx == 0);
-							t->selection(searchValue, q_where_op, q_resultRid, initQueryResult);
+							t->selection(searchValue, q_where_op, q_resultRid);
 							break;
 						}
 						case ColumnBase::charType:
@@ -868,8 +948,7 @@ int main_test(void) {
 						{
 							Column<string>* t = (Column<string>*) colBase;
 							string searchValue = q_where_value;
-							bool initQueryResult = (fidx == 0);
-							t->selection(searchValue, q_where_op, q_resultRid, initQueryResult);
+							t->selection(searchValue, q_where_op, q_resultRid);
 							break;
 						}
 					}

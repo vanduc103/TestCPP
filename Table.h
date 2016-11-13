@@ -29,8 +29,9 @@ public:
 		delete m_columns;
 	}
 
-	Table(vector<ColumnBase*>& columns) {
-		m_columns = &columns;
+	Table(vector<ColumnBase*>* columns) {
+		if (columns == NULL) columns = new vector<ColumnBase*>();
+		m_columns = columns;
 	}
 
 	vector<ColumnBase*>* columns() {
@@ -48,12 +49,7 @@ public:
 		return (int) m_columns->size();
 	}
 
-	size_t numOfRows() {
-		return ((Column<int>*) m_columns->at(0))->vecValueSize();
-	}
-
 	ColumnBase* getColumnByName(string colName) {
-		//int tupleSize = tuple_size<decltype(m_columns)>::value;;
 		for (size_t i = 0; i < m_columns->size(); i++) {
 			ColumnBase* column = m_columns->at(i);
 			if (column->getName() == colName)
@@ -63,12 +59,12 @@ public:
 	}
 
 	// do some processes on all columns
-	void processColumn() {
+	void processColumn(uint64_t csn = 0) {
 		for (ColumnBase* colBase : *m_columns) {
 			if (colBase->getType() == ColumnBase::intType) {
 				Column<int>* col = (Column<int>*) colBase;
 				if (col->isBulkInsert())
-					col->bulkBuildVecVector();
+					col->bulkBuildVecVector(csn);
 				col->getDictionary()->clearTemp();
 				col->bitPackingVecValue();
 			}
@@ -76,7 +72,7 @@ public:
 					 colBase->getType() == ColumnBase::varcharType) {
 				Column<string>* col = (Column<string>*) colBase;
 				if (col->isBulkInsert()) {
-					col->bulkBuildVecVector();
+					col->bulkBuildVecVector(csn);
 				}
 				if (col->isCreateInvertedIndex()) {
 					col->createInvertedIndex();

@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string>
 #include <iostream>
+#include <sstream>
 #include "TestCpp.h"
 #include "Table.h"
 
@@ -48,23 +49,24 @@ int main(int argc, char* argv[]) {
 
 					// command type
 					string commandType = command.at(0);
-					cout << commandType << endl;
+					string result = "";
 					if (commandType == "UPDATE") {
 						cout << ">> Update command" << endl;
-						updateCommand(*orders, command);
+						result = updateCommand(*orders, command);
 					}
 					else if (commandType == "INSERT") {
 						cout << ">> Insert command" << endl;
-						insertCommand(*orders, command);
+						result = insertCommand(*orders, command);
 					}
 					else if (commandType == "SCAN") {
 						cout << ">> Scan command" << endl;
-						string result = scanCommand(*orders, command);
-						cout << "SCAN result: " << endl;
-						cout << result;
+						result = scanCommand(*orders, command);
 					}
-
-                    client << data;
+					else {
+						result = "NO VALID COMMAND FOUND !";
+					}
+					// send result to client
+                    client << result;
                     /* CODE  END  */
                 }
             } catch(SocketException&) {}
