@@ -38,7 +38,7 @@ private:
 	// DATA SPACE
 	struct data_column {
 		bool versionFlag;
-		size_t encodedValue;
+		size_t encodedValueIdx;	// index to encodedValue in vecValue vector
 		uint64_t csn;
 	};
 	vector<data_column>* dataColumn;
@@ -46,7 +46,7 @@ private:
 	// VERSION SPACE
 	vector<size_t>* versionVecValue;
 	struct version_column {
-		size_t encodedValue;
+		size_t encodedValueIdx;	// index to encodedValue in versionVecValue vector
 		uint64_t csn;
 		version_column* next;
 	};
@@ -99,6 +99,14 @@ public:
 			return -1; // indicate no result
 		}
 		return PackedArray_get(packed, index);
+	}
+
+	void updateVecValueAt(size_t index, size_t value) {
+		if (index < 0 || index >= packed->count) {
+			return; // no update
+		}
+		// update by bit backing
+		PackedArray_set(packed, index, value);
 	}
 
 	void printVecValue(int row) {
@@ -160,7 +168,7 @@ public:
 		if (!bulkInsert) {
 			// build dataColumn vector
 			data_column data;
-			data.encodedValue = vecValue->size() - 1;
+			data.encodedValueIdx = vecValue->size() - 1;
 			data.csn = csn;
 			data.versionFlag = false;
 			dataColumn->push_back(data);
@@ -188,7 +196,7 @@ public:
 			dataColumn->resize(0);
 			for (size_t i = 0; i < vecValue->size(); i++) {
 				data_column data;
-				data.encodedValue = i;
+				data.encodedValueIdx = i;
 				data.csn = csn;
 				data.versionFlag = false;
 				dataColumn->push_back(data);
@@ -287,7 +295,7 @@ public:
 		bitPackingVecValue();
 		// create new data space value
 		data_column newData;
-		newData.encodedValue = newInsertVecValueIdx;
+		newData.encodedValueIdx = newInsertVecValueIdx;
 		newData.csn = csn;
 		newData.versionFlag = false;
 		dataColumn->push_back(newData);
@@ -310,10 +318,10 @@ public:
 			versionVecValue->push_back(dictPos);
 		}
 		// encoded value is index in vecValue
-		size_t encodedValue = versionVecValue->size() - 1;
+		size_t encodedValueIdx = versionVecValue->size() - 1;
 		// create new version
 		version_column newVersion;
-		newVersion.encodedValue = encodedValue;
+		newVersion.encodedValueIdx = encodedValueIdx;
 		newVersion.next = NULL;
 		newVersion.csn = csn;
 		// check previous version on hash table
@@ -354,7 +362,7 @@ public:
 				if (!data.versionFlag) {
 					// check txTs >= CSN
 					if (txTs >= data.csn) {
-						size_t vecValueIdx = data.encodedValue;
+						size_t vecValueIdx = data.encodedValueIdx;
 						size_t dictIdx = this->vecValueAt(vecValueIdx);
 						T* a = this->getDictionary()->lookup(dictIdx);
 						if (a != NULL) {
@@ -381,7 +389,7 @@ public:
 							versionData = *versionData.next;
 						}
 						if (txTs >= versionData.csn) {
-							size_t versionVecValueIdx = versionData.encodedValue;
+							size_t versionVecValueIdx = versionData.encodedValueIdx;
 							size_t dictIdx = this->versionVecValue->at(
 									versionVecValueIdx);
 							// lookup in Dictionary or Delta space
@@ -406,12 +414,49 @@ public:
 	}
 
 	void updateVersionSpace2DataSpace(size_t rid) {
-		// get latest version from hashtable
-
+		try {
+			// get latest version of rid from hashtable
+			size_t versionIdx = hashtable->at(rid);
+			version_column lastestVersion = versionColumn->at(versionIdx);
+			size_t encodedValue = versionVecValue->at(lastestVersion.encodedValueIdx);
+			// get data at rid
+			data_column dataAtRid = dataColumn->at(rid);
+			// update vecValue and data at rid
+			updateVecValueAt(rid, encodedValue);
+			dataAtRid.csn = lastestVersion.csn;
+			dataAtRid.encodedValueIdx = rid;	// index to vecValue
+			dataAtRid.versionFlag = true;
+			dataColumn->at(rid) = dataAtRid;
+		} catch (exception& e) {
+			//do nothing
+		}
 	}
 
 	void removeOldVersion(size_t rid, uint64_t txStartTs) {
-
+		try {
+			// get latest version of rid from hashtable
+			size_t versionIdx = hashtable->at(rid);
+			version_column version = versionColumn->at(versionIdx);
+			// check if history version has csn < txStartTs then remove
+			version_column* curVersion = &version;
+			while (version.csn >= txStartTs && version.next != NULL) {
+				curVersion = &version;
+				version = *version.next;
+			}
+			// remove old version
+			if (version.csn < txStartTs) {
+				vector<version_column*> vecOld;
+				while (version.next != NULL) {
+					vecOld.push_back(version.next);
+				}
+				for (version_column* old : vecOld) {
+					delete old;
+				}
+				curVersion->next = NULL;
+			}
+		} catch (exception& e) {
+			//do nothing
+		}
 	}
 };
 
