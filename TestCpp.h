@@ -11,12 +11,14 @@
 #include <string>
 #include <vector>
 #include "Table.h"
+#include "GarbageCollector.h"
+#include "Transaction.h"
 
 using namespace std;
 
 Table* createTable(string createQuery);
-string updateCommand(Table &table, vector<string> command);
-string insertCommand(Table &table, vector<string> command);
-string scanCommand(Table &table, vector<string> command);
+string updateCommand(Table* table, Transaction* transaction, vector<string> command, GarbageCollector* garbage);
+string insertCommand(Table* table, Transaction* transaction, vector<string> command);
+string scanCommand(Table* table, Transaction* transaction, vector<string> command);
 
 #endif /* TESTCPP_H_ */

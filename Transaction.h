@@ -15,16 +15,17 @@ namespace std {
 
 class Transaction {
 public:
-	enum TRANSACTION_STATUS {PENDING, STARTED, COMMITED, ABORTED};
+	enum TRANSACTION_STATUS {WAITING, STARTED, COMMITED, ABORTED};
 	struct transaction {
 		uint64_t txnId;		// transaction id
 		uint64_t csn;		// commit squence number
 		uint64_t startTs;	// start time stamp
 		TRANSACTION_STATUS status;
-		vector<size_t> vecRid;			// list of row id this transaction use
+		vector<size_t> vecRid;// list of row id this transaction select
 	};
 	static vector<transaction>* vecTransaction;
 	static vector<size_t>* vecActiveTransaction;
+	static vector<size_t>* vecWaitingTransaction;
 
 private:
 
@@ -40,7 +41,10 @@ public:
 	uint64_t getTimestampAsCSN();
 	void commitTx(size_t txIdx, uint64_t csn);
 	void abortTx(size_t txIdx);
-	vector<transaction>* listActiveTransaction();
+	vector<size_t> listActiveTransaction();
+	Transaction::transaction getTransaction(size_t txIdx);
+	void addToWaitingList(size_t txIdx);
+	vector<size_t> getWaitingList();
 };
 
 } /* namespace std */

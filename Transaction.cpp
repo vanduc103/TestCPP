@@ -85,12 +85,12 @@ void Transaction::abortTx(size_t txIdx) {
 	}
 }
 
-vector<transaction>* Transaction::listActiveTransaction() {
-	vector<transaction>* lsTx = new vector<transaction>();
-	for (size_t i = 0; i < vecActiveTransaction->size(); i++) {
-		lsTx->push_back(vecTransaction->at(vecActiveTransaction->at(i)));
-	}
-	return lsTx;
+vector<size_t> Transaction::listActiveTransaction() {
+	return *vecActiveTransaction;
+}
+
+Transaction::transaction Transaction::getTransaction(size_t txIdx) {
+	return vecTransaction->at(txIdx);
 }
 
 } /* namespace std */

@@ -196,7 +196,7 @@ Table* createTable(string createQuery) {
 };
 
 // UPDATE
-string updateCommand(Table &table, vector<string> command) {
+string updateCommand(Table* table, Transaction* transaction, vector<string> command, GarbageCollector* garbage) {
 	if (command.size() < 2) {
 		return "ERROR: No row id field !";
 	}
@@ -211,14 +211,13 @@ string updateCommand(Table &table, vector<string> command) {
 	int o_totalprice = -1;
 	string o_comment = "";
 	// create Transaction
-	Transaction transaction;
-	size_t txIdx = transaction.createTx();
+	size_t txIdx = transaction->createTx();
+	transaction->startTx(txIdx);
+	uint64_t csn = transaction->getTimestampAsCSN();
 	// get update value from command and execute update
-	transaction.startTx(txIdx);
-	uint64_t csn = transaction.getTimestampAsCSN();
 	if (command.size() >= 3) {
 		o_orderkey = stoi(command[3-1]);
-		Column<int>* col = (Column<int>*) table.getColumnByName("o_orderkey");
+		Column<int>* col = (Column<int>*) table->getColumnByName("o_orderkey");
 		if (col != NULL) {
 			if (col->numOfRows() <= rid) {
 				return "ERROR: row id excess number of rows !";
@@ -228,7 +227,7 @@ string updateCommand(Table &table, vector<string> command) {
 	}
 	if (command.size() >= 4) {
 		o_orderstatus = command[4-1];
-		Column<string>* col = (Column<string>*) table.getColumnByName("o_orderstatus");
+		Column<string>* col = (Column<string>*) table->getColumnByName("o_orderstatus");
 		if (col->numOfRows() <= rid) {
 			return "ERROR: row id excess number of rows !";
 		}
@@ -236,7 +235,7 @@ string updateCommand(Table &table, vector<string> command) {
 	}
 	if (command.size() >= 5) {
 		o_totalprice = stoi(command[5-1]);
-		Column<int>* col = (Column<int>*) table.getColumnByName("o_totalprice");
+		Column<int>* col = (Column<int>*) table->getColumnByName("o_totalprice");
 		if (col->numOfRows() <= rid) {
 			return "ERROR: row id excess number of rows !";
 		}
@@ -244,20 +243,24 @@ string updateCommand(Table &table, vector<string> command) {
 	}
 	if (command.size() >= 6) {
 		o_comment = command[6-1];
-		Column<string>* col = (Column<string>*) table.getColumnByName("o_comment");
+		Column<string>* col = (Column<string>*) table->getColumnByName("o_comment");
 		if (col->numOfRows() <= rid) {
 			return "ERROR: row id excess number of rows !";
 		}
 		col->addVersionVecValue(o_comment, csn, rid);
 	}
 	// commit Transaction
-	transaction.commitTx(txIdx, csn);
+	transaction->commitTx(txIdx, csn);
+	// add to Garbage Collector
+	vector<size_t> updateRids;
+	updateRids.push_back(rid);
+	garbage->updateRecentlyUpdateRids(updateRids);
 
 	return "Updated 1 row with rid = " + to_string(rid + 1);
 }
 
 // INSERT
-string insertCommand(Table &table, vector<string> command) {
+string insertCommand(Table* table, Transaction* transaction, vector<string> command) {
 	if (command.size() < 5) {
 		cout << "ERROR: Not enough 4 fields to INSERT !" << endl;
 		return "ERROR: Not enough 4 fields to INSERT !";
@@ -268,38 +271,37 @@ string insertCommand(Table &table, vector<string> command) {
 	int o_totalprice = -1;
 	string o_comment = "";
 	// create Transaction
-	Transaction transaction;
-	size_t txIdx = transaction.createTx();
+	size_t txIdx = transaction->createTx();
 	// get insert value from command and execute insert
-	transaction.startTx(txIdx);
-	uint64_t csn = transaction.getTimestampAsCSN();
+	transaction->startTx(txIdx);
+	uint64_t csn = transaction->getTimestampAsCSN();
 	if (command.size() >= 2) {
 		o_orderkey = stoi(command[2-1]);
-		Column<int>* col = (Column<int>*) table.getColumnByName("o_orderkey");
+		Column<int>* col = (Column<int>*) table->getColumnByName("o_orderkey");
 		col->insertDataVecValue(o_orderkey, csn);
 	}
 	if (command.size() >= 3) {
 		o_orderstatus = command[3-1];
-		Column<string>* col = (Column<string>*) table.getColumnByName("o_orderstatus");
+		Column<string>* col = (Column<string>*) table->getColumnByName("o_orderstatus");
 		col->insertDataVecValue(o_orderstatus, csn);
 	}
 	if (command.size() >= 4) {
 		o_totalprice = stoi(command[4-1]);
-		Column<int>* col = (Column<int>*) table.getColumnByName("o_totalprice");
+		Column<int>* col = (Column<int>*) table->getColumnByName("o_totalprice");
 		col->insertDataVecValue(o_totalprice, csn);
 	}
 	if (command.size() >= 5) {
 		o_comment = command[5-1];
-		Column<string>* col = (Column<string>*) table.getColumnByName("o_comment");
+		Column<string>* col = (Column<string>*) table->getColumnByName("o_comment");
 		col->insertDataVecValue(o_comment, csn);
 	}
 	// commit Transaction
-	transaction.commitTx(txIdx, csn);
+	transaction->commitTx(txIdx, csn);
 	return "INSERTED 1 row !";
 }
 
 // SCAN
-string scanCommand(Table &table, vector<string> command) {
+string scanCommand(Table* table, Transaction* transaction, vector<string> command) {
 	if (command.size() < 4) {
 		cout << "SCAN command must have at least 4 fields: SCAN|filter value|filter column|filter operator !" << endl;
 		return "SCAN command must have at least 4 fields: SCAN|filter value|filter column|filter operator !";
@@ -310,13 +312,12 @@ string scanCommand(Table &table, vector<string> command) {
 
 	clock_t begin_time = clock();
 	// create Transaction
-	Transaction transaction;
-	size_t txIdx = transaction.createTx();
-	transaction.startTx(txIdx);
-	uint64_t txTs = transaction.getStartTimestamp(txIdx);
+	size_t txIdx = transaction->createTx();
+	transaction->startTx(txIdx);
+	uint64_t txTs = transaction->getStartTimestamp(txIdx);
 	// select with filter value 1
 	vector<bool>* q_resultRid = new vector<bool>();
-	ColumnBase* colBase = table.getColumnByName(column1);
+	ColumnBase* colBase = table->getColumnByName(column1);
 	if (colBase->getType() == ColumnBase::intType) {
 		Column<int>* col = (Column<int>*) colBase;
 		int searchValue = stoi(filterValue1);
@@ -327,7 +328,14 @@ string scanCommand(Table &table, vector<string> command) {
 		string searchValue = filterValue1;
 		col->selection(searchValue, ColumnBase::sToOp(operator1), q_resultRid);
 	}
-	// scan all columns with version space
+	// update list row id for Transaction
+	vector<size_t> vecRowid;
+	for (size_t i = 0; i < q_resultRid->size(); i++) {
+		if (q_resultRid->at(i))
+			vecRowid.push_back(i);
+	}
+	transaction->updateRid2Transaction(txIdx, vecRowid);
+	// scan all columns with version space to get result
 	cout << "********* Print scan result ************" << endl;
 	size_t totalresult = 0;
 	for (size_t i = 0; i < q_resultRid->size(); i++) {
@@ -337,14 +345,14 @@ string scanCommand(Table &table, vector<string> command) {
 	size_t limit = 10;
 	size_t limitCount = 0;
 	vector<string> q_select_fields;
-	for (ColumnBase* colBase : *table.columns()) {
+	for (ColumnBase* colBase : *table->columns()) {
 		q_select_fields.push_back(colBase->getName());
 	}
 	vector<string> outputs (limit + 2);
 	for (size_t idx = 0; idx < q_select_fields.size(); idx++) {
 		string select_field_name = q_select_fields[idx];
 		outputs[0] += select_field_name + ", ";
-		ColumnBase* colBase = (ColumnBase*) table.getColumnByName(select_field_name);
+		ColumnBase* colBase = (ColumnBase*) table->getColumnByName(select_field_name);
 		if (colBase == NULL) continue;
 		if (colBase->getType() == ColumnBase::intType) {
 			Column<int>* t = (Column<int>*) colBase;
@@ -366,7 +374,7 @@ string scanCommand(Table &table, vector<string> command) {
 		}
 	}
 	// commit transaction
-	transaction.commitTx(txIdx, transaction.getTimestampAsCSN());
+	transaction->commitTx(txIdx, transaction->getTimestampAsCSN());
 	// show result
 	std::stringstream showing;
 	if (limitCount >= limit) {

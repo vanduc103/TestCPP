@@ -4,17 +4,56 @@
 #include <stdio.h>
 #include <string>
 #include <iostream>
-#include <sstream>
+#include <thread>
+#include <map>
 #include "TestCpp.h"
 #include "Table.h"
+#include "GarbageCollector.h"
 
 using namespace std;
+
+// mapping between client and waiting transactionId
+map<size_t, ServerSocket*> mapClientTx;
+
+void restartWaitingTransaction(int interval, Transaction* transaction, Table* table, GarbageCollector* garbage, vector<string> updateCommand)
+{
+	std::thread([this, interval]()
+	{
+		while (true) {
+			std::this_thread::sleep_for(
+			std::chrono::milliseconds(interval));
+			// get transaction and execute updateCommand
+			vector<size_t> txWaitingList = transaction->getWaitingList();
+			for (size_t i = 0; i < txWaitingList.size(); i++) {
+				Transaction::transaction tx = transaction->getTransaction(txWaitingList.at(i));
+				size_t txIdx = tx.txnId;
+				// execute command and return to client
+				string result = updateCommand(table, transaction, updateCommand, garbage);
+				ServerSocket* client = mapClientTx[txIdx];
+				if (client != NULL) {
+					client << result;
+				}
+			}
+		}
+	}).detach();
+}
 
 int main(int argc, char* argv[]) {
 	puts("***** Simple Column-Store Database start ******");
 	// Create table orders
 	string createQuery = "create table orders (o_orderkey integer, o_orderstatus text, o_totalprice integer, o_comment text)";
-	Table* orders = createTable(createQuery);
+	Table* ordersTable = createTable(createQuery);
+
+	// Transaction
+	Transaction* transaction = new Transaction();
+
+	// start Garbage collection as thread
+	GarbageCollector* garbage = new GarbageCollector();
+	garbage->setTransaction(transaction);
+	garbage->setTable(ordersTable);
+	// run each 1000 ms
+	garbage->start(10000);
+
 
     try {
         // Create the Socket
@@ -52,15 +91,16 @@ int main(int argc, char* argv[]) {
 					string result = "";
 					if (commandType == "UPDATE") {
 						cout << ">> Update command" << endl;
-						result = updateCommand(*orders, command);
+						result = updateCommand(ordersTable, transaction, command, garbage);
+
 					}
 					else if (commandType == "INSERT") {
 						cout << ">> Insert command" << endl;
-						result = insertCommand(*orders, command);
+						result = insertCommand(ordersTable, transaction, command);
 					}
 					else if (commandType == "SCAN") {
 						cout << ">> Scan command" << endl;
-						result = scanCommand(*orders, command);
+						result = scanCommand(ordersTable, transaction, command);
 					}
 					else {
 						result = "NO VALID COMMAND FOUND !";
