@@ -93,4 +93,19 @@ Transaction::transaction Transaction::getTransaction(size_t txIdx) {
 	return vecTransaction->at(txIdx);
 }
 
+void Transaction::addToWaitingList(size_t txIdx) {
+	transaction tx = vecTransaction->at(txIdx);
+	tx.status = TRANSACTION_STATUS::WAITING;
+	vecWaitingTransaction->push_back(tx);
+}
+
+void Transaction::updateTxDetail(size_t txIdx, ServerSocket* client,
+		size_t rid, vector<string> &command) {
+	transaction tx = vecTransaction->at(txIdx);
+	transaction_detail* detail = new transaction_detail();
+	detail->client = client;
+	detail->rid = rid;
+	detail->command = command;
+}
+
 } /* namespace std */

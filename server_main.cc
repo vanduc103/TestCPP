@@ -12,10 +12,8 @@
 
 using namespace std;
 
-// mapping between client and waiting transactionId
-map<size_t, ServerSocket*> mapClientTx;
 
-void restartWaitingTransaction(int interval, Transaction* transaction, Table* table, GarbageCollector* garbage, vector<string> updateCommand)
+void restartWaitingTransaction(int interval, Transaction* transaction, Table* table, GarbageCollector* garbage)
 {
 	std::thread([this, interval]()
 	{
@@ -27,9 +25,10 @@ void restartWaitingTransaction(int interval, Transaction* transaction, Table* ta
 			for (size_t i = 0; i < txWaitingList.size(); i++) {
 				Transaction::transaction tx = transaction->getTransaction(txWaitingList.at(i));
 				size_t txIdx = tx.txnId;
+				Transaction::transaction_detail* txDetail = tx.txDetail;
 				// execute command and return to client
-				string result = updateCommand(table, transaction, updateCommand, garbage);
-				ServerSocket* client = mapClientTx[txIdx];
+				string result = updateCommand(table, transaction, txDetail->command, garbage);
+				ServerSocket* client = txDetail->client;
 				if (client != NULL) {
 					client << result;
 				}
@@ -91,7 +90,7 @@ int main(int argc, char* argv[]) {
 					string result = "";
 					if (commandType == "UPDATE") {
 						cout << ">> Update command" << endl;
-						result = updateCommand(ordersTable, transaction, command, garbage);
+						result = updateCommand(client, ordersTable, transaction, command, garbage);
 
 					}
 					else if (commandType == "INSERT") {

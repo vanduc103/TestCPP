@@ -13,11 +13,12 @@
 #include "Table.h"
 #include "GarbageCollector.h"
 #include "Transaction.h"
+#include "server/ServerSocket.h"
 
 using namespace std;
 
 Table* createTable(string createQuery);
-string updateCommand(Table* table, Transaction* transaction, vector<string> command, GarbageCollector* garbage);
+string updateCommand(ServerSocket* client, Table* table, Transaction* transaction, vector<string> command, GarbageCollector* garbage);
 string insertCommand(Table* table, Transaction* transaction, vector<string> command);
 string scanCommand(Table* table, Transaction* transaction, vector<string> command);
 

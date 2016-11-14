@@ -69,6 +69,9 @@ public:
 	void setSorted(bool sorted) {
 		this->sorted = sorted;
 	}
+	bool getSorted() {
+		return this->sorted;
+	}
 
 	vector<T>* getBulkVecValue() {
 		return bulkVecValue;

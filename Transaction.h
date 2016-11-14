@@ -10,18 +10,25 @@
 
 #include <chrono>
 #include <vector>
+#include <string>
+#include "server/ServerSocket.h"
 
 namespace std {
 
 class Transaction {
 public:
 	enum TRANSACTION_STATUS {WAITING, STARTED, COMMITED, ABORTED};
+	struct transaction_detail {
+		ServerSocket* client;
+		size_t rid;
+		vector<string> command;
+	};
 	struct transaction {
 		uint64_t txnId;		// transaction id
 		uint64_t csn;		// commit squence number
 		uint64_t startTs;	// start time stamp
 		TRANSACTION_STATUS status;
-		vector<size_t> vecRid;// list of row id this transaction select
+		transaction_detail* txDetail;
 	};
 	static vector<transaction>* vecTransaction;
 	static vector<size_t>* vecActiveTransaction;
@@ -45,6 +52,7 @@ public:
 	Transaction::transaction getTransaction(size_t txIdx);
 	void addToWaitingList(size_t txIdx);
 	vector<size_t> getWaitingList();
+	void updateTxDetail(size_t txIdx, ServerSocket* client, size_t rid, vector<string> &command);
 };
 
 } /* namespace std */

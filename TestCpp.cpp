@@ -196,7 +196,8 @@ Table* createTable(string createQuery) {
 };
 
 // UPDATE
-string updateCommand(Table* table, Transaction* transaction, vector<string> command, GarbageCollector* garbage) {
+string updateCommand(ServerSocket* client, Table* table, Transaction* transaction,
+		vector<string> command, GarbageCollector* garbage) {
 	if (command.size() < 2) {
 		return "ERROR: No row id field !";
 	}
@@ -213,7 +214,7 @@ string updateCommand(Table* table, Transaction* transaction, vector<string> comm
 	// create Transaction
 	size_t txIdx = transaction->createTx();
 	transaction->startTx(txIdx);
-	uint64_t csn = transaction->getTimestampAsCSN();
+	uint64_t csn = transaction->getStartTimestamp(txIdx);
 	// get update value from command and execute update
 	if (command.size() >= 3) {
 		o_orderkey = stoi(command[3-1]);
@@ -222,6 +223,8 @@ string updateCommand(Table* table, Transaction* transaction, vector<string> comm
 			if (col->numOfRows() <= rid) {
 				return "ERROR: row id excess number of rows !";
 			}
+			// check column's CSN with tx timestamp
+
 			col->addVersionVecValue(o_orderkey, csn, rid);
 		}
 	}
