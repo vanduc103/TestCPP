@@ -211,11 +211,12 @@ public:
 	}
 
 	bool selection(T& searchValue, ColumnBase::OP_TYPE q_where_op,
-			vector<bool>* q_resultRid) {
+			vector<bool>* q_resultRid, bool initResultRid = true) {
 		// init q_resultRid to all true
-		for (size_t i = 0; i < numOfRows(); i++) {
-			q_resultRid->push_back(true);
-		}
+		if (initResultRid)
+			for (size_t i = 0; i < numOfRows(); i++) {
+				q_resultRid->push_back(true);
+			}
 		vector<size_t> result;
 		this->getDictionary()->search(searchValue, q_where_op, result);
 
@@ -301,11 +302,19 @@ public:
 		dataColumn->push_back(newData);
 	}
 
+	uint64_t getCSN(size_t rid) {
+		try {
+			return dataColumn->at(rid).csn;
+		} catch (out_of_range& e) {
+			return 0;
+		}
+	}
+
 	// VERSION SPACE
 	void addVersionVecValue(T& value, uint64_t csn, size_t rid) {
 		// add to delta space and version vector (start from last dictionary position)
 		bool sorted = dictionary->getSorted();
-		size_t encodedValue = deltaSpace->addNewElement(value, versionVecValue, sorted, false);
+		deltaSpace->addNewElement(value, versionVecValue, sorted, false);
 		// get index of encodedValue in versionVecValue
 		size_t encodedValueIdx = versionVecValue->size() - 1;
 		// create new version
@@ -412,7 +421,7 @@ public:
 			T* a = deltaSpace->lookup(encodedValue);
 			// update this value into column's dictionary
 			vecValue = unpackingVecValue();
-			size_t newEncodedValue = dictionary->addNewElement(a, vecValue, dictionary->getSorted(), false);
+			size_t newEncodedValue = dictionary->addNewElement(*a, vecValue, dictionary->getSorted(), false);
 			vecValue->pop_back();	// remove last item
 			bitPackingVecValue();
 			// get data at rid

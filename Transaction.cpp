@@ -17,6 +17,7 @@ Transaction::~Transaction() {
 
 vector<Transaction::transaction>* Transaction::vecTransaction = new vector<Transaction::transaction>();
 vector<size_t>* Transaction::vecActiveTransaction = new vector<size_t>();
+vector<size_t>* Transaction::vecWaitingTransaction = new vector<size_t>();
 
 size_t Transaction::createTx() {
 	transaction newTx;
@@ -25,7 +26,7 @@ size_t Transaction::createTx() {
 			> (chrono::steady_clock::now().time_since_epoch()).count();
 	newTx.startTs = 0;
 	newTx.csn = 0;
-	newTx.status = TRANSACTION_STATUS::PENDING;
+	newTx.status = TRANSACTION_STATUS::WAITING;
 	vecTransaction->push_back(newTx);
 
 	// return index to this new transaction
@@ -96,16 +97,23 @@ Transaction::transaction Transaction::getTransaction(size_t txIdx) {
 void Transaction::addToWaitingList(size_t txIdx) {
 	transaction tx = vecTransaction->at(txIdx);
 	tx.status = TRANSACTION_STATUS::WAITING;
-	vecWaitingTransaction->push_back(tx);
+	tx.startTs = 0;
+	vecTransaction->at(txIdx) = tx;
+	vecWaitingTransaction->push_back(txIdx);
 }
 
-void Transaction::updateTxDetail(size_t txIdx, ServerSocket* client,
-		size_t rid, vector<string> &command) {
+vector<size_t> Transaction::getWaitingList() {
+	return *vecWaitingTransaction;
+}
+
+void Transaction::setClient(size_t txIdx, ServerSocket* client) {
 	transaction tx = vecTransaction->at(txIdx);
-	transaction_detail* detail = new transaction_detail();
-	detail->client = client;
-	detail->rid = rid;
-	detail->command = command;
+	tx.client = client;
+}
+
+void Transaction::setCommand(size_t txIdx, vector<string> command) {
+	transaction tx = vecTransaction->at(txIdx);
+	tx.command = command;
 }
 
 } /* namespace std */

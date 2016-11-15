@@ -49,7 +49,11 @@ public:
 
 	// run garbage collection
 	void run() {
-		cout << "Garbage Collector running ! " << endl;
+		// if no recently updated rid => stop
+		if (recentlyUpdatedRids.size() == 0) {
+			return;
+		}
+		cout << "Garbage Collector running ! with size = " << recentlyUpdatedRids.size() << endl;
 		// get active transactions
 		vector<size_t> vecActiveTx = transaction->listActiveTransaction();
 		// loop through all columns of table to garbage collecting
@@ -103,6 +107,8 @@ public:
 				}
 			}
 		}
+		// clear recently updated rid
+		recentlyUpdatedRids.clear();
 	}
 
 	void start(int interval)

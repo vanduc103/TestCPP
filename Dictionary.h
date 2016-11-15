@@ -63,7 +63,7 @@ public:
 	void search(T& value, ColumnBase::OP_TYPE opType, vector<size_t>& result);
 	void searchWithSorted(T& value, ColumnBase::OP_TYPE opType, vector<size_t>& result);
 	void searchWithNoSorted(T& value, ColumnBase::OP_TYPE opType, vector<size_t>& result);
-	size_t addNewElement(T& value, vector<size_t>* vecValue, bool sorted, bool bulkInsert, size_t startPos = 0);
+	size_t addNewElement(T& value, vector<size_t>* vecValue, bool sorted, bool bulkInsert);
 	size_t size();
 	void print(int row);
 	void setSorted(bool sorted) {

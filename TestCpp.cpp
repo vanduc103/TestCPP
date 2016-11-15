@@ -197,7 +197,7 @@ Table* createTable(string createQuery) {
 
 // UPDATE
 string updateCommand(ServerSocket* client, Table* table, Transaction* transaction,
-		vector<string> command, GarbageCollector* garbage) {
+		vector<string> command, GarbageCollector* garbage, size_t txIdx) {
 	if (command.size() < 2) {
 		return "ERROR: No row id field !";
 	}
@@ -211,8 +211,12 @@ string updateCommand(ServerSocket* client, Table* table, Transaction* transactio
 	string o_orderstatus = "";
 	int o_totalprice = -1;
 	string o_comment = "";
-	// create Transaction
-	size_t txIdx = transaction->createTx();
+	// create Transaction (if new command)
+	if (txIdx == (size_t) -1) {
+		txIdx = transaction->createTx();
+		transaction->setClient(txIdx, client);
+		transaction->setCommand(txIdx, command);
+	}
 	transaction->startTx(txIdx);
 	uint64_t csn = transaction->getStartTimestamp(txIdx);
 	// get update value from command and execute update
@@ -223,9 +227,11 @@ string updateCommand(ServerSocket* client, Table* table, Transaction* transactio
 			if (col->numOfRows() <= rid) {
 				return "ERROR: row id excess number of rows !";
 			}
-			// check column's CSN with tx timestamp
-
-			col->addVersionVecValue(o_orderkey, csn, rid);
+			// check column's CSN with tx start time stamp
+			if (col->getCSN(rid) <= csn)
+				col->addVersionVecValue(o_orderkey, csn, rid);
+			else
+				transaction->addToWaitingList(txIdx);
 		}
 	}
 	if (command.size() >= 4) {
@@ -234,7 +240,11 @@ string updateCommand(ServerSocket* client, Table* table, Transaction* transactio
 		if (col->numOfRows() <= rid) {
 			return "ERROR: row id excess number of rows !";
 		}
-		col->addVersionVecValue(o_orderstatus, csn, rid);
+		// check column's CSN with tx start time stamp
+		if (col->getCSN(rid) <= csn)
+			col->addVersionVecValue(o_orderstatus, csn, rid);
+		else
+			transaction->addToWaitingList(txIdx);
 	}
 	if (command.size() >= 5) {
 		o_totalprice = stoi(command[5-1]);
@@ -242,7 +252,11 @@ string updateCommand(ServerSocket* client, Table* table, Transaction* transactio
 		if (col->numOfRows() <= rid) {
 			return "ERROR: row id excess number of rows !";
 		}
-		col->addVersionVecValue(o_totalprice, csn, rid);
+		// check column's CSN with tx start time stamp
+		if (col->getCSN(rid) <= csn)
+			col->addVersionVecValue(o_totalprice, csn, rid);
+		else
+			transaction->addToWaitingList(txIdx);
 	}
 	if (command.size() >= 6) {
 		o_comment = command[6-1];
@@ -250,16 +264,23 @@ string updateCommand(ServerSocket* client, Table* table, Transaction* transactio
 		if (col->numOfRows() <= rid) {
 			return "ERROR: row id excess number of rows !";
 		}
-		col->addVersionVecValue(o_comment, csn, rid);
+		// check column's CSN with tx start time stamp
+		if (col->getCSN(rid) <= csn)
+			col->addVersionVecValue(o_comment, csn, rid);
+		else
+			transaction->addToWaitingList(txIdx);
 	}
-	// commit Transaction
-	transaction->commitTx(txIdx, csn);
-	// add to Garbage Collector
-	vector<size_t> updateRids;
-	updateRids.push_back(rid);
-	garbage->updateRecentlyUpdateRids(updateRids);
+	// commit Transaction (if not in waiting list)
+	if (transaction->getTransaction(txIdx).status != Transaction::TRANSACTION_STATUS::WAITING) {
+		transaction->commitTx(txIdx, csn);
+		// add to Garbage Collector
+		vector<size_t> updateRids;
+		updateRids.push_back(rid);
+		garbage->updateRecentlyUpdateRids(updateRids);
 
-	return "Updated 1 row with rid = " + to_string(rid + 1);
+		return "Updated 1 row with rid = " + to_string(rid + 1);
+	}
+	return "WAITING";
 }
 
 // INSERT
@@ -331,6 +352,26 @@ string scanCommand(Table* table, Transaction* transaction, vector<string> comman
 		string searchValue = filterValue1;
 		col->selection(searchValue, ColumnBase::sToOp(operator1), q_resultRid);
 	}
+	// filter 2
+	if (command.size() >= 7) {
+		string filterValue2 = command[4];
+		string column2 = command[5];
+		string operator2 = command[6];
+		// select with filter value 2
+		ColumnBase* colBase = table->getColumnByName(column2);
+		bool initResultRid = false;
+		if (colBase->getType() == ColumnBase::intType) {
+			Column<int>* col = (Column<int>*) colBase;
+			int searchValue = stoi(filterValue2);
+			col->selection(searchValue, ColumnBase::sToOp(operator2), q_resultRid, initResultRid);
+		}
+		else if (colBase->getType() == ColumnBase::charType) {
+			Column<string>* col = (Column<string>*) colBase;
+			string searchValue = filterValue2;
+			col->selection(searchValue, ColumnBase::sToOp(operator2), q_resultRid, initResultRid);
+		}
+	}
+
 	// update list row id for Transaction
 	vector<size_t> vecRowid;
 	for (size_t i = 0; i < q_resultRid->size(); i++) {
@@ -936,6 +977,7 @@ int main_test(void) {
 					string q_where_field = q_where_fields[fidx];
 					ColumnBase::OP_TYPE q_where_op = q_where_ops[fidx];
 					string q_where_value = q_where_values[fidx];
+					bool initResultRid = (fidx == 0);
 
 					// get column by name then cast to appropriate column object based on type
 					ColumnBase* colBase = table->getColumnByName(q_where_field);
@@ -951,7 +993,7 @@ int main_test(void) {
 								cerr << "Exception: " << e.what() << endl;
 								break;
 							}
-							t->selection(searchValue, q_where_op, q_resultRid);
+							t->selection(searchValue, q_where_op, q_resultRid, initResultRid);
 							break;
 						}
 						case ColumnBase::charType:
@@ -959,7 +1001,7 @@ int main_test(void) {
 						{
 							Column<string>* t = (Column<string>*) colBase;
 							string searchValue = q_where_value;
-							t->selection(searchValue, q_where_op, q_resultRid);
+							t->selection(searchValue, q_where_op, q_resultRid, initResultRid);
 							break;
 						}
 					}

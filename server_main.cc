@@ -15,22 +15,23 @@ using namespace std;
 
 void restartWaitingTransaction(int interval, Transaction* transaction, Table* table, GarbageCollector* garbage)
 {
-	std::thread([this, interval]()
+	std::thread([interval, transaction, table, garbage]()
 	{
 		while (true) {
+			cout << "here" << endl;
 			std::this_thread::sleep_for(
 			std::chrono::milliseconds(interval));
 			// get transaction and execute updateCommand
 			vector<size_t> txWaitingList = transaction->getWaitingList();
 			for (size_t i = 0; i < txWaitingList.size(); i++) {
+				cout << "waiting number " << i << endl;
 				Transaction::transaction tx = transaction->getTransaction(txWaitingList.at(i));
 				size_t txIdx = tx.txnId;
-				Transaction::transaction_detail* txDetail = tx.txDetail;
+				ServerSocket* client = tx.client;
 				// execute command and return to client
-				string result = updateCommand(table, transaction, txDetail->command, garbage);
-				ServerSocket* client = txDetail->client;
-				if (client != NULL) {
-					client << result;
+				string result = updateCommand(client, table, transaction, tx.command, garbage, txIdx);
+				if (client != NULL && result != "WAITING") {
+					(*client) << result;
 				}
 			}
 		}
@@ -53,6 +54,8 @@ int main(int argc, char* argv[]) {
 	// run each 1000 ms
 	garbage->start(10000);
 
+	// restart waiting transaction as thread
+	restartWaitingTransaction(10000, transaction, ordersTable, garbage);
 
     try {
         // Create the Socket
@@ -90,8 +93,7 @@ int main(int argc, char* argv[]) {
 					string result = "";
 					if (commandType == "UPDATE") {
 						cout << ">> Update command" << endl;
-						result = updateCommand(client, ordersTable, transaction, command, garbage);
-
+						result = updateCommand(&client, ordersTable, transaction, command, garbage);
 					}
 					else if (commandType == "INSERT") {
 						cout << ">> Insert command" << endl;
@@ -105,7 +107,8 @@ int main(int argc, char* argv[]) {
 						result = "NO VALID COMMAND FOUND !";
 					}
 					// send result to client
-                    client << result;
+					if (result != "WAITING")
+						client << result;
                     /* CODE  END  */
                 }
             } catch(SocketException&) {}

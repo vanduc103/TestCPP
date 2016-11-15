@@ -18,17 +18,14 @@ namespace std {
 class Transaction {
 public:
 	enum TRANSACTION_STATUS {WAITING, STARTED, COMMITED, ABORTED};
-	struct transaction_detail {
-		ServerSocket* client;
-		size_t rid;
-		vector<string> command;
-	};
 	struct transaction {
 		uint64_t txnId;		// transaction id
 		uint64_t csn;		// commit squence number
 		uint64_t startTs;	// start time stamp
 		TRANSACTION_STATUS status;
-		transaction_detail* txDetail;
+		ServerSocket* client;
+		vector<size_t> vecRid;
+		vector<string> command;
 	};
 	static vector<transaction>* vecTransaction;
 	static vector<size_t>* vecActiveTransaction;
@@ -52,7 +49,8 @@ public:
 	Transaction::transaction getTransaction(size_t txIdx);
 	void addToWaitingList(size_t txIdx);
 	vector<size_t> getWaitingList();
-	void updateTxDetail(size_t txIdx, ServerSocket* client, size_t rid, vector<string> &command);
+	void setClient(size_t txIdx, ServerSocket* client);
+	void setCommand(size_t txIdx, vector<string> command);
 };
 
 } /* namespace std */

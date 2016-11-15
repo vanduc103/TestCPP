@@ -261,19 +261,19 @@ void Dictionary<T>::searchWithNoSorted(T& value, ColumnBase::OP_TYPE opType, vec
 }
 
 template<class T>
-size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue, bool sorted, bool bulkInsert, size_t startPos) {
+size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue, bool sorted, bool bulkInsert) {
 	if (items->empty()) {
 		items->push_back(value);
 		if (bulkInsert)
 			bulkVecValue->push_back(value);
-		vecValue->push_back(0 + startPos);
+		vecValue->push_back(0);
 		if (!sorted) (*sMap)[value] = 1;
 		return 0;
 	} else if (!sorted) {
 		// check if value existed on dictionary
 		if ((*sMap)[value] == 0) {
 			items->push_back(value);
-			vecValue->push_back(items->size() - 1 + startPos);
+			vecValue->push_back(items->size() - 1);
 			(*sMap)[value] = vecValue->back() + 1;
 		}
 		else {
@@ -291,8 +291,8 @@ size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue, bool sor
 		if (lower != items->end() && equalFunc(value, *lower)) {
 			// return the position of lower
 			long elementPos = lower - items->begin();
-			vecValue->push_back(elementPos + startPos);
-			return elementPos + startPos;
+			vecValue->push_back(elementPos);
+			return elementPos;
 		} else {
 			// The position of new element in dictionary
 			size_t newElementPos = 0L;
@@ -300,7 +300,7 @@ size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue, bool sor
 				// insert to the end of dictionary
 				newElementPos = items->size();
 				items->push_back(value);
-				vecValue->push_back(newElementPos + startPos);
+				vecValue->push_back(newElementPos);
 			} else {
 				newElementPos = lower - items->begin();
 				// insert into dictionary
@@ -308,16 +308,16 @@ size_t Dictionary<T>::addNewElement(T& value, vector<size_t>* vecValue, bool sor
 				// update (+1) to all elements in vecValue have value >= newElementPos
 				if (!bulkInsert) {
 					for (int i = 0; i < vecValue->size(); i++) {
-						if (vecValue->at(i) >= newElementPos + startPos) {
+						if (vecValue->at(i) >= newElementPos) {
 							++vecValue->at(i);
 						}
 					}
 				}
-				vecValue->push_back(newElementPos + startPos);
+				vecValue->push_back(newElementPos);
 			}
 
 			// return the position of new element
-			return newElementPos + startPos;
+			return newElementPos;
 		}
 	}
 }
