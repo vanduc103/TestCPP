@@ -3,7 +3,6 @@
 #include "SocketException.h"
 #include <string>
 #include <iostream>
-#include <sstream>
 #include <fstream>
 
 using namespace std;
@@ -30,7 +29,8 @@ int main(int argc, char* argv[]) {
                     // receive reply from server
                     c_socket >> reply;
                 } catch (SocketException&) {}
-                out << "[Response]\t" << reply << "\n";
+                out << "[Response]\n" << reply << "\n";
+                out.flush();
                 std::cout << "[Response]\t" << endl << reply << "\n";
             }
         }

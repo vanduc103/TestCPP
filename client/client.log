@@ -1,0 +1,2 @@
+[Sending]	SCAN|daaa
+[Response]	SCAN command must have at least 4 fields: SCAN|filter value|filter column|filter operator !
