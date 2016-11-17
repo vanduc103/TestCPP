@@ -391,11 +391,7 @@ public:
 							size_t dictIdx = this->versionVecValue->at(
 									versionVecValueIdx);
 							// lookup in Dictionary or Delta space
-							T* a = this->getDictionary()->lookup(dictIdx);
-							if (a == NULL) {
-								a = this->deltaSpace->lookup(
-										dictIdx - dictionary->size());
-							}
+							T* a = deltaSpace->lookup(dictIdx);
 							if (a != NULL) {
 								outputs.push_back(*a);
 							}

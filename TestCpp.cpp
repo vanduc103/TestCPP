@@ -126,7 +126,7 @@ Table* createTable(string createQuery) {
 	// read file
 	cout << "Enter table source file path: ";
 	string filePath = "/home/duclv/homework/data1M.csv";
-	//getline(cin, filePath);
+	getline(cin, filePath);
 	ifstream infile(filePath);
 	string line;
 	string delim = ",";

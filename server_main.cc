@@ -18,13 +18,12 @@ void restartWaitingTransaction(int interval, Transaction* transaction, Table* ta
 	std::thread([interval, transaction, table, garbage]()
 	{
 		while (true) {
-			cout << "here" << endl;
 			std::this_thread::sleep_for(
 			std::chrono::milliseconds(interval));
 			// get transaction and execute updateCommand
 			vector<size_t> txWaitingList = transaction->getWaitingList();
 			for (size_t i = 0; i < txWaitingList.size(); i++) {
-				cout << "waiting number " << i << endl;
+				cout << "waiting transaction #" << i << endl;
 				Transaction::transaction tx = transaction->getTransaction(txWaitingList.at(i));
 				size_t txIdx = tx.txnId;
 				ServerSocket* client = tx.client;
