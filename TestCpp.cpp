@@ -24,7 +24,7 @@
 #include "Column.h"
 #include "ColumnBase.h"
 #include "Table.h"
-#include "SQLParser.h"
+#include "sql-parser/SQLParser.h"
 #include "Util.h"
 #include "TestCpp.h"
 #include "Transaction.h"
@@ -126,7 +126,7 @@ Table* createTable(string createQuery) {
 	// read file
 	cout << "Enter table source file path: ";
 	string filePath = "/home/duclv/homework/data1M.csv";
-	getline(cin, filePath);
+	//getline(cin, filePath);
 	ifstream infile(filePath);
 	string line;
 	string delim = ",";
@@ -157,7 +157,7 @@ Table* createTable(string createQuery) {
 			ColumnBase* colBase = columns->at(i);
 			if (colBase->getType() == ColumnBase::intType) {
 				int intValue = stoi(item);
-				bool sorted = true; bool bulkInsert = true;
+				bool sorted = true, bulkInsert = true;
 				// update dictionary
 				Column<int>* col = (Column<int>*) colBase;
 				col->updateDictionary(intValue, sorted, bulkInsert, csn);
@@ -165,7 +165,7 @@ Table* createTable(string createQuery) {
 			else {
 				// char or varchar type
 				boost::replace_all(item, "\"", "");
-				bool sorted = false; bool bulkInsert = true;
+				bool sorted = false, bulkInsert = true;
 				// update dictionary
 				Column<string>* col = (Column<string>*) colBase;
 				col->updateDictionary(item, sorted, bulkInsert, csn);
@@ -299,29 +299,34 @@ string insertCommand(Table* table, Transaction* transaction, vector<string> comm
 	// get insert value from command and execute insert
 	transaction->startTx(txIdx);
 	uint64_t csn = transaction->getTimestampAsCSN();
+	size_t numOfRow = 0;
 	if (command.size() >= 2) {
 		o_orderkey = stoi(command[2-1]);
 		Column<int>* col = (Column<int>*) table->getColumnByName("o_orderkey");
 		col->insertDataVecValue(o_orderkey, csn);
+		numOfRow = col->numOfRows();
 	}
 	if (command.size() >= 3) {
 		o_orderstatus = command[3-1];
 		Column<string>* col = (Column<string>*) table->getColumnByName("o_orderstatus");
 		col->insertDataVecValue(o_orderstatus, csn);
+		numOfRow = col->numOfRows();
 	}
 	if (command.size() >= 4) {
 		o_totalprice = stoi(command[4-1]);
 		Column<int>* col = (Column<int>*) table->getColumnByName("o_totalprice");
 		col->insertDataVecValue(o_totalprice, csn);
+		numOfRow = col->numOfRows();
 	}
 	if (command.size() >= 5) {
 		o_comment = command[5-1];
 		Column<string>* col = (Column<string>*) table->getColumnByName("o_comment");
 		col->insertDataVecValue(o_comment, csn);
+		numOfRow = col->numOfRows();
 	}
 	// commit Transaction
 	transaction->commitTx(txIdx, csn);
-	return "INSERTED 1 row !";
+	return "INSERTED 1 row ! Number of rows is: " + numOfRow;
 }
 
 // SCAN
@@ -380,7 +385,7 @@ string scanCommand(Table* table, Transaction* transaction, vector<string> comman
 	}
 	transaction->updateRid2Transaction(txIdx, vecRowid);
 	// scan all columns with version space to get result
-	cout << "********* Print scan result ************" << endl;
+	//cout << "********* Print scan result ************" << endl;
 	size_t totalresult = 0;
 	for (size_t i = 0; i < q_resultRid->size(); i++) {
 		if (q_resultRid->at(i))
@@ -434,11 +439,11 @@ string scanCommand(Table* table, Transaction* transaction, vector<string> comman
 	std::stringstream returnResult;
 	for (string output : outputs) {
 		if (!output.empty()) {
-			cout << output << endl;
+			//cout << output << endl;
 			returnResult << output << "\n";
 		}
 	}
-	std::cout << "Query time: " << float(clock() - begin_time)/CLOCKS_PER_SEC << " seconds " << endl;
+	returnResult << "Query time: " << float(clock() - begin_time)/CLOCKS_PER_SEC << " seconds " << endl;
 	return returnResult.str();
 }
 

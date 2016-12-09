@@ -8,6 +8,7 @@
 #define DICTIONARY_H_
 
 #include "ColumnBase.h"
+#include "Util.h"
 #include <vector>
 #include <string>
 #include <map>
@@ -82,6 +83,10 @@ public:
 	}
 
 	void buildInvertedIndex();
+
+	// use for checkpoint logging
+	string saveToDisk();
+	void restore(string fileName);
 };
 
 

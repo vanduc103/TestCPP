@@ -16,9 +16,11 @@
 #include <map>
 #include <stdexcept>
 #include <algorithm>
+#include <cstdint>
 #include "ColumnBase.h"
 #include "Dictionary.h"
 #include "PackedArray.h"
+#include "Transaction.h"
 #include <stdio.h>
 
 namespace std {
@@ -53,6 +55,9 @@ private:
 	vector<version_column>* versionColumn;
 	Dictionary<T>* deltaSpace;
 	map<size_t, size_t>* hashtable;
+
+	// Transaction
+	Transaction tx;
 public:
 	Column() {
 		dictionary = new Dictionary<T>();
@@ -203,6 +208,9 @@ public:
 			}
 		}
 		bulkVecValue->resize(0);
+
+		// save all bitpacking and dictionary to disk as checkpoint
+
 	}
 
 	void createInvertedIndex() {
@@ -310,8 +318,21 @@ public:
 		}
 	}
 
+	void setCSN(size_t rid, bool setMaximum = true) {
+		try {
+			data_column data = dataColumn->at(rid);
+			if (setMaximum)
+				data.csn = UINT64_MAX;
+			dataColumn->at(rid) = data;
+		} catch (out_of_range& e) {
+			// nothing
+		}
+	}
+
 	// VERSION SPACE
 	void addVersionVecValue(T& value, uint64_t csn, size_t rid) {
+		// set maximum csn so that another transaction cannot update
+		this->setCSN(rid, true);
 		// add to delta space and version vector (start from last dictionary position)
 		bool sorted = dictionary->getSorted();
 		deltaSpace->addNewElement(value, versionVecValue, sorted, false);
@@ -457,6 +478,43 @@ public:
 			}
 		} catch (exception& e) {
 			//do nothing
+		}
+	}
+
+	// save to disk for checkpoint
+	vector<string> saveToDisk() {
+		// save column basic information
+		string fileColToSave = "column_" + string(Util::currentMilisecond());
+		vector<string>* contentColToSave = new vector<string>();
+		contentColToSave->append(this->getName());
+		contentColToSave->append(this->typeToString(this->getType()));
+		Util::saveToDisk(contentColToSave, fileColToSave);
+		// save dictionary
+		string fileDictToSave = this->dictionary->saveToDisk();
+		// save vecValue
+		vecValue = unpackingVecValue();
+		string vecValueFileToSave = "vecValue_" + string(Util::currentMilisecond());
+		vector<string>* vecValueToSave = new vector<string>();
+		for (size_t v : (*vecValue)) {
+			vecValueFileToSave->append(string(v));
+		}
+		Util::saveToDisk(vecValueToSave, vecValueFileToSave);
+		// return files to save
+		vector<string> fileToSave;
+		fileToSave.append(fileColToSave);
+		fileToSave.append(fileDictToSave);
+		fileToSave.append(vecValueFileToSave);
+		return fileToSave;
+	}
+
+	// restore from logging
+	void restore(string colFile, string dictFile, string vecValueFile) {
+		// redo column
+		vector<string>* contentCol = new vector<string>();
+		Util::readFromDisk(contentCol, colFile);
+		if (contentCol->size() == 2) {
+			this->setName(contentCol->at(0));
+			this->setType(this->typeToString(contentCol->at(1)));
 		}
 	}
 

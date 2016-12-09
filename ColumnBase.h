@@ -50,6 +50,23 @@ public:
 		else if (op == "<>") return OP_TYPE::neOp;
 		return OP_TYPE::containOp;
 	}
+
+	string typeToString(COLUMN_TYPE type) {
+		switch (type) {
+			case COLUMN_TYPE::intType:
+				return "INTEGER";
+			default:
+				return "STRING";
+		}
+	}
+
+	COLUMN_TYPE stringToType(string type) {
+		if (type == "INTEGER") {
+			return COLUMN_TYPE::intType;
+		}
+		else
+			return COLUMN_TYPE::varcharType;
+	}
 };
 
 } /* namespace std */

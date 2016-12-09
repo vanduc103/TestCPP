@@ -391,6 +391,35 @@ void Dictionary<T>::print(int row) {
 	}
 }
 
+template<class T>
+string Dictionary<T>::saveToDisk() {
+	string fileToSave = "dictionary_" + string(Util::currentMilisecond());
+	vector<string>* content = new vector<string>();
+	content->append(string(sorted));
+	for (size_t i = 0; i < items->size(); i++) {
+		content->append(string(items->at(i)));
+	}
+	Util::saveToDisk(content, fileToSave);
+	return fileToSave;
+}
+
+template<class T>
+void Dictionary<T>::restore(string fileName) {
+	vector<string>* content = new vector<string>();
+	Util::readFromDisk(content, fileName);
+
+	if (content->size() >= 1 && items != NULL) {
+		// restore sorted
+		this->sorted = content->at(0) != "0";
+
+		// restore dictionary values
+		for (size_t i = 1; i < content->size(); i++) {
+			items->append(stoi(content->at(i)));
+		}
+	}
+	delete content;
+}
+
 template class Dictionary<string> ;
 template class Dictionary<int> ;
 

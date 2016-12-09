@@ -1,5 +1,5 @@
 CXXFLAGS =	-O2 -g -Wall -fmessage-length=0 -std=c++11 -lstdc++ -pthread -lsqlparser -L/usr/local/lib/ \
-			-I/home/duclv/work/sql-parser/src/ -I/usr/local/boost_1_61_0 -I/server
+			-I/sql-parser -I/usr/local/boost_1_61_0 -I/server
 
 OBJS =		TestCpp.o Table.o Dictionary.o Column.o ColumnBase.o PackedArray.o Util.o Transaction.o GarbageCollector.o \
 			$(patsubst %.o,server/%.o,ServerSocket.o Socket.o) server_main.o 

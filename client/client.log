@@ -1,2 +1,3 @@
-[Sending]	SCAN|daaa
-[Response]	SCAN command must have at least 4 fields: SCAN|filter value|filter column|filter operator !
+[Sending]	UPDATE|3|8888
+[Response]
+Updated 1 row with rid = 3
