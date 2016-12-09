@@ -516,6 +516,18 @@ public:
 			this->setName(contentCol->at(0));
 			this->setType(this->typeToString(contentCol->at(1)));
 		}
+		delete contentCol;
+		// restore dictionary
+		this->dictionary->restore(dictFile);
+		// restore vecValue
+		vector<string>* contentVecValue = new vector<string>();
+		Util::readFromDisk(contentVecValue, vecValueFile);
+		for (size_t i = 0; i < contentVecValue->size(); i++) {
+			vecValue->append(stoi(contentVecValue->at(i)));
+		}
+		// bit packing
+		bitPackingVecValue();
+		delete contentVecValue;
 	}
 
 };
