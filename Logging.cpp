@@ -6,16 +6,120 @@
  */
 
 #include "Logging.h"
+#include "Util.h"
+#include "Table.h"
 
 namespace std {
 
 Logging::Logging() {
-	// TODO Auto-generated constructor stub
-
+	privateLogBuffer = new vector<logging*>();
 }
 
 Logging::~Logging() {
-	// TODO Auto-generated destructor stub
+	if (privateLogBuffer != NULL) {
+		for (logging* log : (*privateLogBuffer)) {
+			if (log != NULL)
+				delete log;
+		}
+		delete privateLogBuffer;
+	}
+}
+
+vector<Logging::logging*>* Logging::publicLogBuffer = new vector<Logging::logging*>();
+
+
+void Logging::saveCheckpoint(Table* table) {
+	// create folder log
+	Util::createFolder(this->logPath);
+
+	// write content
+	string fileName = this->logPath + "/checkpoint_" + to_string(Util::currentMilisecond());
+	if (table != NULL) {
+		vector<string>* content = new vector<string>();
+		content->push_back("Checkpoint start " + to_string(Util::currentMilisecond()));
+		content->push_back(table->saveToDisk(this->logPath));
+		content->push_back("Checkpoint end " + to_string(Util::currentMilisecond()));
+		Util::saveToDisk(content, fileName);
+	}
+}
+
+void Logging::redoLogUpdate(size_t txIdx, LOG_TX_ACTION txAction){
+	logging* newLog = new logging();
+	newLog->txIdx = txIdx;
+	newLog->txAction = txAction;
+	privateLogBuffer->push_back(newLog);
+}
+
+void Logging::redoLogAdd(size_t txIdx, LOG_OBJECT objType, vector<string>* logContent) {
+	logging* newLog = new logging();
+	newLog->txIdx = txIdx;
+	newLog->objType = objType;
+	newLog->logContent = logContent;
+	privateLogBuffer->push_back(newLog);
+}
+
+void Logging::redoLogPublicMerge() {
+	// save this private log buffer to public buffer
+	publicLogBuffer->insert(publicLogBuffer->end(), this->privateLogBuffer->begin(), this->privateLogBuffer->end());
+}
+
+void Logging::redoLogSave() {
+	string logFileName = this->logPath + "/redo_log_" + to_string(Util::currentMilisecond());
+	vector<string>* content = new vector<string>();
+	for (size_t i = 0; i < publicLogBuffer->size(); i++) {
+		logging* log = publicLogBuffer->at(i);
+		switch (log->txAction) {
+			case TX_START: {
+				content->push_back(to_string(log->txIdx) + "|start");
+				break;
+			}
+			case TX_COMMIT: {
+				content->push_back(to_string(log->txIdx) + "|commit");
+				break;
+			}
+			case TX_END: {
+				content->push_back(to_string(log->txIdx) + "|end");
+				break;
+			}
+		}
+		string objValue = "";
+		switch (log->objType) {
+			case INSERT:
+				objValue = to_string(log->txIdx) + "|insert|";
+				break;
+			case DELTA_SPACE:
+				objValue = to_string(log->txIdx) + "|delta_space|";
+				break;
+			case VERSION_VECVALUE:
+				objValue = to_string(log->txIdx) + "|version_vec_value|";
+				break;
+			case HASHTABLE:
+				objValue = to_string(log->txIdx) + "|hashtable|";
+				break;
+			case VERSION_COLUMN:
+				objValue = to_string(log->txIdx) + "|version_column|";
+				break;
+		}
+		if (log->logContent != NULL && log->logContent->size() > 0) {
+			string tmpValue = "";
+			for (size_t i = 0; i < log->logContent->size(); i++) {
+				string value = log->logContent->at(i);
+				tmpValue += value + "|";
+			}
+			delete log->logContent;
+			objValue += tmpValue;
+			content->push_back(objValue);
+		}
+	}
+	if (publicLogBuffer->size() > 0) {
+		// save to disk
+		Util::saveToDisk(content, logFileName);
+		// clear buffer
+		for (logging* log : (*publicLogBuffer)) {
+			if (log != NULL) delete log;
+		}
+		publicLogBuffer->resize(0);
+	}
 }
 
 } /* namespace std */

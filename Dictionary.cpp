@@ -391,33 +391,108 @@ void Dictionary<T>::print(int row) {
 	}
 }
 
+// overload to_string for string case
+string to_string(string val) {
+	return val;
+}
+
 template<class T>
-string Dictionary<T>::saveToDisk() {
-	string fileToSave = "dictionary_" + string(Util::currentMilisecond());
+string Dictionary<T>::saveToDisk(string logPath) {
+	string fileToSave = logPath + "/dictionary_" + to_string(Util::currentMilisecond());
 	vector<string>* content = new vector<string>();
-	content->append(string(sorted));
+	content->push_back(to_string(sorted));
 	for (size_t i = 0; i < items->size(); i++) {
-		content->append(string(items->at(i)));
+		T value = items->at(i);
+		content->push_back(to_string(value));
 	}
 	Util::saveToDisk(content, fileToSave);
 	return fileToSave;
 }
 
-template<class T>
-void Dictionary<T>::restore(string fileName) {
+template<>
+void Dictionary<int>::restore(string fileName) {
 	vector<string>* content = new vector<string>();
 	Util::readFromDisk(content, fileName);
 
 	if (content->size() >= 1 && items != NULL) {
+		items->clear(); // clear before restore
 		// restore sorted
 		this->sorted = content->at(0) != "0";
 
 		// restore dictionary values
 		for (size_t i = 1; i < content->size(); i++) {
-			items->append(stoi(content->at(i)));
+			string value = content->at(i);
+			items->push_back(stoi(value));
 		}
 	}
 	delete content;
+}
+
+template<>
+void Dictionary<string>::restore(string fileName) {
+	vector<string>* content = new vector<string>();
+	Util::readFromDisk(content, fileName);
+
+	if (content->size() >= 1 && items != NULL) {
+		items->clear(); // clear before restore
+		// restore sorted
+		this->sorted = content->at(0) != "0";
+
+		// restore dictionary values
+		for (size_t i = 1; i < content->size(); i++) {
+			string value = content->at(i);
+			items->push_back(value);
+		}
+	}
+	delete content;
+}
+
+template<class T>
+void Dictionary<T>::redoLogCreate(vector<string>* content) {
+	// add all items to content
+	if (content != NULL) {
+		content->push_back(to_string(sorted));
+		for (size_t i = 0; i < items->size(); i++) {
+			T value = items->at(i);
+			content->push_back(to_string(value));
+		}
+	}
+}
+
+template<>
+void Dictionary<int>::redoLogRestore(vector<string>* content) {
+	if (content != NULL) {
+		if (content->size() >= 1 && items != NULL) {
+			items->clear();	// clear before restore
+			// restore sorted
+			this->sorted = content->at(0) != "0";
+
+			// restore dictionary values
+			for (size_t i = 1; i < content->size(); i++) {
+				string value = content->at(i);
+				items->push_back(stoi(value));
+			}
+		}
+		delete content;
+	}
+}
+
+template<>
+void Dictionary<string>::redoLogRestore(vector<string>* content) {
+	if (content != NULL) {
+		if (content->size() >= 1 && items != NULL) {
+			items->clear();	// clear before restore
+			// restore sorted
+			this->sorted = content->at(0) != "0";
+
+			// restore dictionary values
+			for (size_t i = 1; i < content->size(); i++) {
+				string value = content->at(i);
+				items->push_back(value);
+			}
+		}
+		delete content;
+	}
 }
 
 template class Dictionary<string> ;

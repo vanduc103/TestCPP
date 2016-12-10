@@ -51,7 +51,7 @@ public:
 		return OP_TYPE::containOp;
 	}
 
-	string typeToString(COLUMN_TYPE type) {
+	string typeToString(ColumnBase::COLUMN_TYPE type) {
 		switch (type) {
 			case COLUMN_TYPE::intType:
 				return "INTEGER";
@@ -60,7 +60,7 @@ public:
 		}
 	}
 
-	COLUMN_TYPE stringToType(string type) {
+	ColumnBase::COLUMN_TYPE stringToType(string type) {
 		if (type == "INTEGER") {
 			return COLUMN_TYPE::intType;
 		}

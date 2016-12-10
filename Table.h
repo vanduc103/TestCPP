@@ -14,6 +14,7 @@
 #include <iostream>
 #include "Column.h"
 #include "ColumnBase.h"
+#include "Util.h"
 
 namespace std {
 
@@ -81,6 +82,67 @@ public:
 				col->bitPackingVecValue();
 			}
 		}
+	}
+
+	// save checkpoint
+	string saveToDisk(string logPath) {
+		vector<string> listFileName;
+		string tableFileName = logPath + "/table_" + to_string(Util::currentMilisecond());
+		vector<string>* content = new vector<string>();
+		content->push_back(this->name);
+		// save column
+		for (ColumnBase* colBase : *m_columns) {
+			if (colBase->getType() == ColumnBase::intType) {
+				Column<int>* col = (Column<int>*) colBase;
+				vector<string> filesToSave = col->saveToDisk(logPath);
+				content->push_back("INTEGER");
+				for(string f : filesToSave) {
+					content->push_back(f);
+				}
+			}
+			else if (colBase->getType() == ColumnBase::charType ||
+					 colBase->getType() == ColumnBase::varcharType) {
+				Column<string>* col = (Column<string>*) colBase;
+				vector<string> filesToSave = col->saveToDisk(logPath);
+				content->push_back("STRING");
+				for(string f : filesToSave) {
+					content->push_back(f);
+				}
+			}
+		}
+		Util::saveToDisk(content, tableFileName);
+		return tableFileName;
+	}
+
+	// restore from checkpoint
+	void restore(string tableFile) {
+		vector<string>* content = new vector<string>();
+		Util::readFromDisk(content, tableFile);
+		if (content->size() >= 1) {
+			// table name
+			this->name = content->at(0);
+		}
+		// restore columns
+		size_t length = content->size();
+		for (size_t i = 1; i < length; i = i+4) {
+			// column type
+			string colType = content->at(i+1);
+			ColumnBase* colBase = new ColumnBase();
+			if (colType == "INTEGER") {
+				Column<int>* col = new Column<int>();
+				if (i+3 < length)
+					col->restore(content->at(i+1), content->at(i+2), content->at(i+3));
+				colBase = col;
+			}
+			else {
+				Column<string>* col = new Column<string>();
+				if (i+3 < length)
+					col->restore(content->at(i+1), content->at(i+2), content->at(i+3));
+				colBase = col;
+			}
+			this->m_columns->push_back(colBase);
+		}
+		delete content;
 	}
 
 };

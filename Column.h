@@ -21,6 +21,7 @@
 #include "Dictionary.h"
 #include "PackedArray.h"
 #include "Transaction.h"
+#include "Logging.h"
 #include <stdio.h>
 
 namespace std {
@@ -330,14 +331,121 @@ public:
 	}
 
 	// VERSION SPACE
-	void addVersionVecValue(T& value, uint64_t csn, size_t rid) {
+	void addVersionVecValue(T& value, uint64_t csn, int rid, size_t txIdx, Logging* logging) {
+		cout << "adad" << endl;
 		// set maximum csn so that another transaction cannot update
-		this->setCSN(rid, true);
+		if (rid != -1)
+			this->setCSN(rid, true);
 		// add to delta space and version vector (start from last dictionary position)
 		bool sorted = dictionary->getSorted();
 		deltaSpace->addNewElement(value, versionVecValue, sorted, false);
 		// get index of encodedValue in versionVecValue
 		size_t encodedValueIdx = versionVecValue->size() - 1;
+		// create new version
+		version_column newVersion;
+		newVersion.encodedValueIdx = encodedValueIdx;
+		newVersion.next = NULL;
+		newVersion.csn = csn;
+		cout << "dadadad" << endl;
+		// rid = -1: INSERT case
+		vector<string>* insertLog = new vector<string>();
+		if (rid == -1) {
+			// add new in data column
+			data_column newData;
+			dataColumn->push_back(newData);
+			rid = dataColumn->size() - 1;
+			// redo log for Insert case
+			insertLog->push_back(to_string(-1));
+			logging->redoLogAdd(txIdx, Logging::INSERT, insertLog);
+		}
+		cout << "here - 1" << endl;
+		// check previous version on hash table
+		int preVersionIdx = -1;
+		try {
+			preVersionIdx = hashtable->at(rid);
+		} catch (out_of_range& e) {
+			// not existed on hash table, keep -1
+			preVersionIdx = -1;
+		}
+		if (preVersionIdx >= 0) {
+			version_column preVersion = versionColumn->at(preVersionIdx);
+			// point the next pointer of new created version to previous version
+			newVersion.next = &preVersion;
+			// replace the previous version on Version space vector by new version
+			versionColumn->at(preVersionIdx) = newVersion;
+		} else {
+			// add new version to Version space vector
+			versionColumn->push_back(newVersion);
+			// create a new entry for rid on Hash table
+			(*hashtable)[rid] = versionColumn->size() - 1;
+		}
+		// update version_flag on DATA space
+		data_column dataValue = dataColumn->at(rid);
+		dataValue.versionFlag = true;
+		dataColumn->at(rid) = dataValue;
+		cout << "here - 2" << endl;
+
+		// create redo log
+		// log delta space
+		vector<string>* deltaSpaceLog = new vector<string>();
+		deltaSpace->redoLogCreate(deltaSpaceLog);
+		logging->redoLogAdd(txIdx, Logging::DELTA_SPACE, deltaSpaceLog);
+		// log version vecValue
+		vector<string>* versionVecValueLog = new vector<string>();
+		for (size_t i = 0; i < versionVecValue->size(); i++) {
+			size_t value = versionVecValue->at(i);
+			versionVecValueLog->push_back(to_string(value));
+		}
+		logging->redoLogAdd(txIdx, Logging::VERSION_VECVALUE, versionVecValueLog);
+		// log versionColumn
+		vector<string>* versionColumnLog = new vector<string>();
+		versionColumnLog->push_back(to_string(encodedValueIdx));
+		versionColumnLog->push_back(to_string(csn));
+		logging->redoLogAdd(txIdx, Logging::VERSION_COLUMN, versionColumnLog);
+		// log hashtable
+		vector<string>* hashtableLog = new vector<string>();
+		hashtableLog->push_back(to_string(rid));
+		logging->redoLogAdd(txIdx, Logging::HASHTABLE, hashtableLog);
+		cout << "here - 3" << endl;
+	}
+
+	void redoLogRestore(vector<string>* deltaSpaceLog, vector<string>* versionVecValueLog,
+						vector<string>* insertLog,
+						vector<string>* versionColumnLog, vector<string>* hashtableLog) {
+		// redo for delta space
+		this->deltaSpace->redoLogRestore(deltaSpaceLog);
+		// redo for versionVecValue
+		this->versionVecValue->clear();
+		for(size_t i = 0; i < versionVecValueLog->size(); i++) {
+			string value = versionVecValueLog->at(i);
+			versionVecValue->push_back(stol(value));
+		}
+		// redo for INSERT case
+		if (insertLog != NULL && insertLog->size() >= 1) {
+			// add new in data column
+			data_column newData;
+			dataColumn->push_back(newData);
+		}
+		// get rid from hashtable log
+		size_t rid = -1;
+		if (hashtableLog->size() >= 1) {
+			rid = stol(hashtableLog->at(0));
+		}
+		else {
+			cout << "hashtable redo log error !";
+			return;
+		}
+		// redo for versionColumn
+		size_t encodedValueIdx = -1;
+		uint64_t csn = 0;
+		if (versionColumnLog->size() >= 2){
+			encodedValueIdx = stol(versionColumnLog->at(0));
+			csn = stol(versionColumnLog->at(1));
+		}
+		else {
+			cout << "versionColumn redo log error !";
+			return;
+		}
 		// create new version
 		version_column newVersion;
 		newVersion.encodedValueIdx = encodedValueIdx;
@@ -482,39 +590,39 @@ public:
 	}
 
 	// save to disk for checkpoint
-	vector<string> saveToDisk() {
+	vector<string> saveToDisk(string logPath) {
 		// save column basic information
-		string fileColToSave = "column_" + string(Util::currentMilisecond());
+		string fileColToSave = logPath + "/column_" + to_string(Util::currentMilisecond());
 		vector<string>* contentColToSave = new vector<string>();
-		contentColToSave->append(this->getName());
-		contentColToSave->append(this->typeToString(this->getType()));
+		contentColToSave->push_back(this->getName());
+		contentColToSave->push_back(this->typeToString(this->getType()));
 		Util::saveToDisk(contentColToSave, fileColToSave);
 		// save dictionary
-		string fileDictToSave = this->dictionary->saveToDisk();
+		string fileDictToSave = this->dictionary->saveToDisk(logPath);
 		// save vecValue
 		vecValue = unpackingVecValue();
-		string vecValueFileToSave = "vecValue_" + string(Util::currentMilisecond());
+		string vecValueFileToSave = logPath + "/vecValue_" + to_string(Util::currentMilisecond());
 		vector<string>* vecValueToSave = new vector<string>();
 		for (size_t v : (*vecValue)) {
-			vecValueFileToSave->append(string(v));
+			vecValueToSave->push_back(to_string(v));
 		}
 		Util::saveToDisk(vecValueToSave, vecValueFileToSave);
 		// return files to save
 		vector<string> fileToSave;
-		fileToSave.append(fileColToSave);
-		fileToSave.append(fileDictToSave);
-		fileToSave.append(vecValueFileToSave);
+		fileToSave.push_back(fileColToSave);
+		fileToSave.push_back(fileDictToSave);
+		fileToSave.push_back(vecValueFileToSave);
 		return fileToSave;
 	}
 
-	// restore from logging
+	// restore from checkpoint
 	void restore(string colFile, string dictFile, string vecValueFile) {
-		// redo column
+		// restore column
 		vector<string>* contentCol = new vector<string>();
 		Util::readFromDisk(contentCol, colFile);
 		if (contentCol->size() == 2) {
 			this->setName(contentCol->at(0));
-			this->setType(this->typeToString(contentCol->at(1)));
+			this->setType(this->stringToType(contentCol->at(1)));
 		}
 		delete contentCol;
 		// restore dictionary
@@ -523,7 +631,7 @@ public:
 		vector<string>* contentVecValue = new vector<string>();
 		Util::readFromDisk(contentVecValue, vecValueFile);
 		for (size_t i = 0; i < contentVecValue->size(); i++) {
-			vecValue->append(stoi(contentVecValue->at(i)));
+			vecValue->push_back(stol(contentVecValue->at(i)));
 		}
 		// bit packing
 		bitPackingVecValue();

@@ -85,8 +85,12 @@ public:
 	void buildInvertedIndex();
 
 	// use for checkpoint logging
-	string saveToDisk();
+	string saveToDisk(string logPath);
 	void restore(string fileName);
+
+	// redo logging
+	void redoLogCreate(vector<string>* content);
+	void redoLogRestore(vector<string>* content);
 };
 
 

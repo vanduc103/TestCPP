@@ -28,6 +28,7 @@
 #include "Util.h"
 #include "TestCpp.h"
 #include "Transaction.h"
+#include "Logging.h"
 
 using namespace std;
 
@@ -188,6 +189,9 @@ Table* createTable(string createQuery) {
 
 	// process columns of table
 	table->processColumn(csn);
+	// save checkpoint
+	Logging* logging = new Logging();
+	logging->saveCheckpoint(table);
 
 	// loaded time
 	cout << "Table Load time: " << float( clock () - begin_time ) /  CLOCKS_PER_SEC << " seconds " << endl;
@@ -196,12 +200,17 @@ Table* createTable(string createQuery) {
 };
 
 // UPDATE
-string updateCommand(ServerSocket* client, Table* table, Transaction* transaction,
+string updateCommand(ServerSocket* client, Table* table, Transaction* transaction, Logging* logging,
 		vector<string> command, GarbageCollector* garbage, size_t txIdx) {
 	if (command.size() < 2) {
 		return "ERROR: No row id field !";
 	}
-	int test = stoi(command[1]);
+	int test = 0;
+	try {
+		test = stoi(command[1]);
+	} catch(exception& e) {
+		return "ERROR: row id must be a number !";
+	}
 	if (test < 1) {
 		return "ERROR: row id must start from 1 !";
 	}
@@ -228,8 +237,10 @@ string updateCommand(ServerSocket* client, Table* table, Transaction* transactio
 				return "ERROR: row id excess number of rows !";
 			}
 			// check column's CSN with tx start time stamp
-			if (col->getCSN(rid) <= csn)
-				col->addVersionVecValue(o_orderkey, csn, rid);
+			if (col->getCSN(rid) <= csn) {
+				logging->redoLogUpdate(txIdx, Logging::TX_START);
+				col->addVersionVecValue(o_orderkey, csn, rid, txIdx, logging);
+			}
 			else
 				transaction->addToWaitingList(txIdx);
 		}
@@ -241,8 +252,10 @@ string updateCommand(ServerSocket* client, Table* table, Transaction* transactio
 			return "ERROR: row id excess number of rows !";
 		}
 		// check column's CSN with tx start time stamp
-		if (col->getCSN(rid) <= csn)
-			col->addVersionVecValue(o_orderstatus, csn, rid);
+		if (col->getCSN(rid) <= csn) {
+			logging->redoLogUpdate(txIdx, Logging::TX_START);
+			col->addVersionVecValue(o_orderstatus, csn, rid, txIdx, logging);
+		}
 		else
 			transaction->addToWaitingList(txIdx);
 	}
@@ -253,8 +266,10 @@ string updateCommand(ServerSocket* client, Table* table, Transaction* transactio
 			return "ERROR: row id excess number of rows !";
 		}
 		// check column's CSN with tx start time stamp
-		if (col->getCSN(rid) <= csn)
-			col->addVersionVecValue(o_totalprice, csn, rid);
+		if (col->getCSN(rid) <= csn) {
+			logging->redoLogUpdate(txIdx, Logging::TX_START);
+			col->addVersionVecValue(o_totalprice, csn, rid, txIdx, logging);
+		}
 		else
 			transaction->addToWaitingList(txIdx);
 	}
@@ -265,14 +280,21 @@ string updateCommand(ServerSocket* client, Table* table, Transaction* transactio
 			return "ERROR: row id excess number of rows !";
 		}
 		// check column's CSN with tx start time stamp
-		if (col->getCSN(rid) <= csn)
-			col->addVersionVecValue(o_comment, csn, rid);
+		if (col->getCSN(rid) <= csn) {
+			logging->redoLogUpdate(txIdx, Logging::TX_START);
+			col->addVersionVecValue(o_comment, csn, rid, txIdx, logging);
+		}
 		else
 			transaction->addToWaitingList(txIdx);
 	}
 	// commit Transaction (if not in waiting list)
 	if (transaction->getTransaction(txIdx).status != Transaction::TRANSACTION_STATUS::WAITING) {
+		// save redo log to public log buffer
+		logging->redoLogUpdate(txIdx, Logging::TX_COMMIT);
+		// commit
 		transaction->commitTx(txIdx, csn);
+		logging->redoLogUpdate(txIdx, Logging::TX_END);
+		logging->redoLogPublicMerge();
 		// add to Garbage Collector
 		vector<size_t> updateRids;
 		updateRids.push_back(rid);
@@ -284,7 +306,7 @@ string updateCommand(ServerSocket* client, Table* table, Transaction* transactio
 }
 
 // INSERT
-string insertCommand(Table* table, Transaction* transaction, vector<string> command) {
+string insertCommand(Table* table, Transaction* transaction, Logging* logging, vector<string> command) {
 	if (command.size() < 5) {
 		cout << "ERROR: Not enough 4 fields to INSERT !" << endl;
 		return "ERROR: Not enough 4 fields to INSERT !";
@@ -298,34 +320,41 @@ string insertCommand(Table* table, Transaction* transaction, vector<string> comm
 	size_t txIdx = transaction->createTx();
 	// get insert value from command and execute insert
 	transaction->startTx(txIdx);
+	logging->redoLogUpdate(txIdx, Logging::TX_START);
 	uint64_t csn = transaction->getTimestampAsCSN();
 	size_t numOfRow = 0;
 	if (command.size() >= 2) {
 		o_orderkey = stoi(command[2-1]);
 		Column<int>* col = (Column<int>*) table->getColumnByName("o_orderkey");
-		col->insertDataVecValue(o_orderkey, csn);
+		col->addVersionVecValue(o_orderkey, csn, -1, txIdx, logging);
 		numOfRow = col->numOfRows();
 	}
 	if (command.size() >= 3) {
 		o_orderstatus = command[3-1];
 		Column<string>* col = (Column<string>*) table->getColumnByName("o_orderstatus");
-		col->insertDataVecValue(o_orderstatus, csn);
+		col->addVersionVecValue(o_orderstatus, csn, -1, txIdx, logging);
 		numOfRow = col->numOfRows();
 	}
 	if (command.size() >= 4) {
 		o_totalprice = stoi(command[4-1]);
 		Column<int>* col = (Column<int>*) table->getColumnByName("o_totalprice");
-		col->insertDataVecValue(o_totalprice, csn);
+		col->addVersionVecValue(o_totalprice, csn, -1, txIdx, logging);
 		numOfRow = col->numOfRows();
 	}
 	if (command.size() >= 5) {
 		o_comment = command[5-1];
 		Column<string>* col = (Column<string>*) table->getColumnByName("o_comment");
-		col->insertDataVecValue(o_comment, csn);
+		col->addVersionVecValue(o_comment, csn, -1, txIdx, logging);
 		numOfRow = col->numOfRows();
 	}
+	// redo log
+	logging->redoLogUpdate(txIdx, Logging::TX_COMMIT);
 	// commit Transaction
 	transaction->commitTx(txIdx, csn);
+	logging->redoLogUpdate(txIdx, Logging::TX_END);
+	logging->redoLogPublicMerge();
+	cout << "done" << endl;
+
 	return "INSERTED 1 row ! Number of rows is: " + numOfRow;
 }
 

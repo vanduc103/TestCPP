@@ -13,6 +13,9 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#define BOOST_NO_CXX11_SCOPED_ENUMS
+#include <boost/filesystem.hpp>
+#undef BOOST_NO_CXX11_SCOPED_ENUMS
 
 #ifndef UTIL_H_
 #define UTIL_H_
@@ -52,10 +55,16 @@ public:
 			ifstream infile(fileName);
 			string line;
 			while(getline(infile, line)) {
-				content->append(line);
+				content->push_back(line);
 			}
 			infile.close();
 		}
+	}
+
+	static void createFolder(string folderPath) {
+		boost::filesystem::path dir(folderPath);
+		boost::filesystem::remove_all(dir);
+		boost::filesystem::create_directory(dir);
 	}
 
 };
