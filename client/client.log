@@ -1,3 +1,20 @@
-[Sending]	INSERT|9999|A|3333|ducv
+[Sending]	UPDATE|1|8888
 [Response]
+Updated 1 row with rid = 1
+[Sending]	SCAN|8888|o_orderkey|=
+[Response]
+o_orderkey, o_orderstatus, o_totalprice, o_comment, 
+8888,      "O",   181229,   "al accounts haggle bli",   
+Showing 1/1 results !
+Query time: 0.001422 seconds 
+
+[Sending]	INSERT|8888|A|5678|duclv
+[Response]
+INSERTED 1 row ! Number of rows is: 15001
+[Sending]	SCAN|8888|o_orderkey|=
+[Response]
+o_orderkey, o_orderstatus, o_totalprice, o_comment, 
+8888,      "O",   181229,   "al accounts haggle bli",   
+Showing 1/1 results !
+Query time: 0.00143 seconds 
 

@@ -355,7 +355,7 @@ string insertCommand(Table* table, Transaction* transaction, Logging* logging, v
 	logging->redoLogPublicMerge();
 	cout << "done" << endl;
 
-	return "INSERTED 1 row ! Number of rows is: " + numOfRow;
+	return "INSERTED 1 row ! Number of rows is: " + to_string(numOfRow);
 }
 
 // SCAN

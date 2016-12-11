@@ -124,20 +124,22 @@ public:
 		}
 		// restore columns
 		size_t length = content->size();
-		for (size_t i = 1; i < length; i = i+4) {
+		for (size_t i = 1; i < length; i = i+5) {
 			// column type
 			string colType = content->at(i+1);
 			ColumnBase* colBase = new ColumnBase();
 			if (colType == "INTEGER") {
 				Column<int>* col = new Column<int>();
-				if (i+3 < length)
-					col->restore(content->at(i+1), content->at(i+2), content->at(i+3));
+				if (i+4 < length)
+					col->restore(content->at(i+1), content->at(i+2),
+							content->at(i+3), content->at(i+4));
 				colBase = col;
 			}
 			else {
 				Column<string>* col = new Column<string>();
 				if (i+3 < length)
-					col->restore(content->at(i+1), content->at(i+2), content->at(i+3));
+					col->restore(content->at(i+1), content->at(i+2),
+							content->at(i+3), content->at(i+4));
 				colBase = col;
 			}
 			this->m_columns->push_back(colBase);

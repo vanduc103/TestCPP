@@ -97,7 +97,7 @@ public:
 	}
 
 	size_t numOfRows() {
-		return packed->count;
+		return dataColumn->size();
 	}
 
 	size_t vecValueAt(size_t index) {
@@ -209,9 +209,6 @@ public:
 			}
 		}
 		bulkVecValue->resize(0);
-
-		// save all bitpacking and dictionary to disk as checkpoint
-
 	}
 
 	void createInvertedIndex() {
@@ -332,7 +329,6 @@ public:
 
 	// VERSION SPACE
 	void addVersionVecValue(T& value, uint64_t csn, int rid, size_t txIdx, Logging* logging) {
-		cout << "adad" << endl;
 		// set maximum csn so that another transaction cannot update
 		if (rid != -1)
 			this->setCSN(rid, true);
@@ -346,7 +342,6 @@ public:
 		newVersion.encodedValueIdx = encodedValueIdx;
 		newVersion.next = NULL;
 		newVersion.csn = csn;
-		cout << "dadadad" << endl;
 		// rid = -1: INSERT case
 		vector<string>* insertLog = new vector<string>();
 		if (rid == -1) {
@@ -356,9 +351,8 @@ public:
 			rid = dataColumn->size() - 1;
 			// redo log for Insert case
 			insertLog->push_back(to_string(-1));
-			logging->redoLogAdd(txIdx, Logging::INSERT, insertLog);
+			logging->redoLogAdd(txIdx, Logging::INSERT, *insertLog);
 		}
-		cout << "here - 1" << endl;
 		// check previous version on hash table
 		int preVersionIdx = -1;
 		try {
@@ -383,30 +377,29 @@ public:
 		data_column dataValue = dataColumn->at(rid);
 		dataValue.versionFlag = true;
 		dataColumn->at(rid) = dataValue;
-		cout << "here - 2" << endl;
 
 		// create redo log
 		// log delta space
 		vector<string>* deltaSpaceLog = new vector<string>();
 		deltaSpace->redoLogCreate(deltaSpaceLog);
-		logging->redoLogAdd(txIdx, Logging::DELTA_SPACE, deltaSpaceLog);
+		logging->redoLogAdd(txIdx, Logging::DELTA_SPACE, *deltaSpaceLog);
+		delete deltaSpaceLog;
 		// log version vecValue
 		vector<string>* versionVecValueLog = new vector<string>();
 		for (size_t i = 0; i < versionVecValue->size(); i++) {
 			size_t value = versionVecValue->at(i);
 			versionVecValueLog->push_back(to_string(value));
 		}
-		logging->redoLogAdd(txIdx, Logging::VERSION_VECVALUE, versionVecValueLog);
+		logging->redoLogAdd(txIdx, Logging::VERSION_VECVALUE, *versionVecValueLog);
 		// log versionColumn
 		vector<string>* versionColumnLog = new vector<string>();
 		versionColumnLog->push_back(to_string(encodedValueIdx));
 		versionColumnLog->push_back(to_string(csn));
-		logging->redoLogAdd(txIdx, Logging::VERSION_COLUMN, versionColumnLog);
+		logging->redoLogAdd(txIdx, Logging::VERSION_COLUMN, *versionColumnLog);
 		// log hashtable
 		vector<string>* hashtableLog = new vector<string>();
 		hashtableLog->push_back(to_string(rid));
-		logging->redoLogAdd(txIdx, Logging::HASHTABLE, hashtableLog);
-		cout << "here - 3" << endl;
+		logging->redoLogAdd(txIdx, Logging::HASHTABLE, *hashtableLog);
 	}
 
 	void redoLogRestore(vector<string>* deltaSpaceLog, vector<string>* versionVecValueLog,
@@ -606,8 +599,18 @@ public:
 		for (size_t v : (*vecValue)) {
 			vecValueToSave->push_back(to_string(v));
 		}
+		vecValue->resize(0);
 		Util::saveToDisk(vecValueToSave, vecValueFileToSave);
-		// return files to save
+		// save dataColumn
+		string dataColumnFileName = logPath + "/dataColumn_" + to_string(Util::currentMilisecond());
+		vector<string>* dataColumnToSave = new vector<string>();
+		for (data_column data : (*this->dataColumn)) {
+			dataColumnToSave->push_back(to_string(data.csn));
+			dataColumnToSave->push_back(to_string(data.encodedValueIdx));
+			dataColumnToSave->push_back(to_string(data.versionFlag));
+		}
+		Util::saveToDisk(dataColumnToSave, dataColumnFileName);
+		// return saved files
 		vector<string> fileToSave;
 		fileToSave.push_back(fileColToSave);
 		fileToSave.push_back(fileDictToSave);
@@ -616,7 +619,7 @@ public:
 	}
 
 	// restore from checkpoint
-	void restore(string colFile, string dictFile, string vecValueFile) {
+	void restore(string colFile, string dictFile, string vecValueFile, string dataColumnFile) {
 		// restore column
 		vector<string>* contentCol = new vector<string>();
 		Util::readFromDisk(contentCol, colFile);
@@ -636,6 +639,21 @@ public:
 		// bit packing
 		bitPackingVecValue();
 		delete contentVecValue;
+		// restore dataColumn
+		vector<string>* contentDataColumn = new vector<string>();
+		Util::readFromDisk(contentDataColumn, dataColumnFile);
+		dataColumn->clear();
+		for (size_t i = 0; i < contentDataColumn->size(); i = i+3) {
+			data_column data;
+			if (i + 1 <= contentDataColumn->size())
+				data.csn = stol(contentDataColumn->at(i));
+			if (i + 2 <= contentDataColumn->size())
+				data.encodedValueIdx = stol(contentDataColumn->at(i+1));
+			if (i + 3 <= contentDataColumn->size())
+				data.versionFlag = contentDataColumn->at(i+2) != "0";
+			dataColumn->push_back(data);
+		}
+		delete contentDataColumn;
 	}
 
 };
