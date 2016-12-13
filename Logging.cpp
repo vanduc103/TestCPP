@@ -135,7 +135,50 @@ void Logging::restore(Table* table) {
 		// get redo log from checkpoint
 		long ckptTime = stol(latestCkpt.substr(latestCkpt.find("checkpoint") + 1));
 		vector<string> allRedoLogs = Util::getNewestFiles(logPath, "redo_log", ckptTime);
+		// sort by oldest to newest file name
+		std::sort(allRedoLogs.begin(), allRedoLogs.end());
+		// restore redo log
+		for (string redoFile : allRedoLogs) {
+			vector<string>* redoContent = new vector<string>();
+			Util::readFromDisk(redoContent, redoFile);
+			vector<string>* deltaSpaceLog = new vector<string>();
+			vector<string>* versionVecValueLog = new vector<string>();
+			vector<string>* insertLog = new vector<string>();
+			vector<string>* versionColumnLog = new vector<string>();
+			vector<string>* hashtableLog = new vector<string>();
 
+			for (size_t i = 0; i < redoContent->size(); i++) {
+				string log = redoContent->at(i);
+				string colName = "";
+				if (log.find("start") != string::npos) {
+
+				}
+				if (log.find("delta_space") != string::npos) {
+					string logContent = log.substr(log.find("delta_space")+1);
+					Util::parseContentToVector(deltaSpaceLog, logContent, "|");
+				}
+				else if (log.find("insert") != string::npos) {
+					string logContent = log.substr(log.find("insert")+1);
+					Util::parseContentToVector(insertLog, logContent, "|");
+				}
+				else if (log.find("version_vec_value") != string::npos) {
+					string logContent = log.substr(log.find("version_vec_value")+1);
+					Util::parseContentToVector(versionVecValueLog, logContent, "|");
+				}
+				else if (log.find("version_column") != string::npos) {
+					string logContent = log.substr(log.find("version_column")+1);
+					Util::parseContentToVector(versionColumnLog, logContent, "|");
+				}
+				else if (log.find("hashtable") != string::npos) {
+					string logContent = log.substr(log.find("hashtable")+1);
+					Util::parseContentToVector(hashtableLog, logContent, "|");
+				}
+				if (log.find("end") != string::npos) {
+					// restore
+
+				}
+			}
+		}
 	}
 }
 
