@@ -47,9 +47,10 @@ void Logging::redoLogUpdate(size_t txIdx, LOG_TX_ACTION txAction){
 	privateLogBuffer->push_back(newLog);
 }
 
-void Logging::redoLogAdd(size_t txIdx, LOG_OBJECT objType, vector<string> logContent) {
+void Logging::redoLogAdd(size_t txIdx, string colName, LOG_OBJECT objType, vector<string> logContent) {
 	logging newLog;
 	newLog.txIdx = txIdx;
+	newLog.colName = colName;
 	newLog.objType = objType;
 	newLog.logContent = logContent;
 	privateLogBuffer->push_back(newLog);
@@ -61,7 +62,6 @@ void Logging::redoLogPublicMerge() {
 }
 
 void Logging::redoLogSave() {
-	cout << "start log save" << endl;
 	string logFileName = this->logPath + "/redo_log_" + to_string(Util::currentMilisecond());
 	vector<string>* content = new vector<string>();
 	for (size_t i = 0; i < publicLogBuffer->size(); i++) {
@@ -80,22 +80,25 @@ void Logging::redoLogSave() {
 				break;
 			}
 		}
-		string objValue = "";
+		string objValue = to_string(log.txIdx) + "|";
+		if (log.colName != "") {
+			objValue += log.colName + "|";
+		}
 		switch (log.objType) {
 			case INSERT:
-				objValue = to_string(log.txIdx) + "|insert|";
+				objValue += "insert|";
 				break;
 			case DELTA_SPACE:
-				objValue = to_string(log.txIdx) + "|delta_space|";
+				objValue += "delta_space|";
 				break;
 			case VERSION_VECVALUE:
-				objValue = to_string(log.txIdx) + "|version_vec_value|";
+				objValue += "version_vec_value|";
 				break;
 			case HASHTABLE:
-				objValue = to_string(log.txIdx) + "|hashtable|";
+				objValue += "hashtable|";
 				break;
 			case VERSION_COLUMN:
-				objValue = to_string(log.txIdx) + "|version_column|";
+				objValue += "version_column|";
 				break;
 		}
 		if (log.logContent.size() > 0) {
@@ -109,11 +112,31 @@ void Logging::redoLogSave() {
 		}
 	}
 	if (publicLogBuffer->size() > 0) {
+		cout << "Start log save" << endl;
 		// save to disk
 		Util::saveToDisk(content, logFileName);
 		publicLogBuffer->resize(0);
+		cout << "End log save" << endl;
 	}
-	cout << "end log save" << endl;
+}
+
+void Logging::restore(Table* table) {
+	// get latest checkpoint
+	string latestCkpt = Util::getLatestFile(logPath, "checkpoint");
+	if (latestCkpt != "") {
+		// restore from checkpoint
+		vector<string>* content = new vector<string>();
+		Util::readFromDisk(content, latestCkpt);
+		if (content->size() >= 3) {
+			string tableFile = content->at(1);
+			table->restore(tableFile);
+		}
+		delete content;
+		// get redo log from checkpoint
+		long ckptTime = stol(latestCkpt.substr(latestCkpt.find("checkpoint") + 1));
+		vector<string> allRedoLogs = Util::getNewestFiles(logPath, "redo_log", ckptTime);
+
+	}
 }
 
 } /* namespace std */

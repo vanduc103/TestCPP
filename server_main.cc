@@ -56,12 +56,8 @@ void flushRedoLogging(int interval, Logging* logging)
 	}).detach();
 }
 
-int main(int argc, char* argv[]) {
-	puts("***** Simple Column-Store Database start ******");
-	// Create table orders
-	string createQuery = "create table orders (o_orderkey integer, o_orderstatus text, o_totalprice integer, o_comment text)";
-	Table* ordersTable = createTable(createQuery);
-
+// start some threads
+void startThreads(Table* table, ServerSocket* server) {
 	// Transaction
 	Transaction* transaction = new Transaction();
 
@@ -72,17 +68,25 @@ int main(int argc, char* argv[]) {
 	// start Garbage collection as thread
 	GarbageCollector* garbage = new GarbageCollector();
 	garbage->setTransaction(transaction);
-	garbage->setTable(ordersTable);
+	garbage->setTable(table);
 	// run each 10 s
 	garbage->start(10000);
+
+	// restart waiting transaction as thread
+	restartWaitingTransaction(10000, transaction, table, garbage, server);
+}
+
+int main(int argc, char* argv[]) {
+	puts("***** Simple Column-Store Database start ******");
+	// Create table orders
+	string createQuery = "create table orders (o_orderkey integer, o_orderstatus text, o_totalprice integer, o_comment text)";
+	Table* table = NULL;
 
     try {
         // Create the Socket
     	int port = 30000;
         ServerSocket server(port);
         std::cout << ">>>> Server is listening at port: " << port << std::endl;
-        // restart waiting transaction as thread
-		restartWaitingTransaction(10000, transaction, ordersTable, garbage, &server);
 
         while(true) {
             ServerSocket client;
@@ -109,29 +113,48 @@ int main(int argc, char* argv[]) {
 					token = data.substr(last);
 					command.push_back(token);
 
+					// transaction
+					Transaction* transaction = new Transaction();
+					// logging
+					Logging* logging = new Logging();
+					// garbage collection
+					GarbageCollector* garbage = new GarbageCollector(table, transaction);
+
 					// command type
 					string commandType = command.at(0);
 					string result = "";
-					// logging
-					Logging* logging = new Logging();
-					if (commandType == "UPDATE") {
+					if (commandType == "CREATE") {
+						cout << ">> Create table" << endl;
+						table = createTable(createQuery);
+					}
+					else if (commandType == "UPDATE") {
 						cout << ">> Update command" << endl;
-						result = updateCommand(&client, ordersTable, transaction, logging, command, garbage);
+						if (table == NULL)
+							result = "No table found !";
+						else
+							result = updateCommand(&client, table, transaction, logging, command, garbage);
 					}
 					else if (commandType == "INSERT") {
 						cout << ">> Insert command" << endl;
-						result = insertCommand(ordersTable, transaction, logging, command);
+						if (table == NULL)
+							result = "No table found !";
+						else
+							result = insertCommand(table, transaction, logging, command);
 					}
 					else if (commandType == "SCAN") {
 						cout << ">> Scan command" << endl;
-						result = scanCommand(ordersTable, transaction, command);
+						if (table == NULL)
+							result = "No table found !";
+						else
+							result = scanCommand(table, transaction, command);
 					}
 					else {
 						result = "NO VALID COMMAND FOUND !";
 					}
 					delete logging;
+					delete transaction;
+					delete garbage;
 					// send result to client
-					cout << result << endl;
 					client << result;
                     /* CODE  END  */
                 }

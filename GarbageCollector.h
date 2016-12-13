@@ -20,23 +20,27 @@
 namespace std {
 
 class GarbageCollector {
-private:
+public:
 	// list of recently updated rids
-	vector<size_t> recentlyUpdatedRids;
+	static vector<size_t>* recentlyUpdatedRids;
+private:
 	// Transaction and Table
 	Transaction* transaction;
 	Table* table;
 
 public:
 	GarbageCollector() {
-		recentlyUpdatedRids = vector<size_t>(0);
 		transaction = NULL;
 		table = NULL;
+	}
+	GarbageCollector(Table* table, Transaction* transaction) {
+		this->table = table;
+		this->transaction = transaction;
 	}
 	virtual ~GarbageCollector() {}
 
 	void updateRecentlyUpdateRids(vector<size_t> updateRids) {
-		recentlyUpdatedRids.insert(recentlyUpdatedRids.end(), updateRids.begin(), updateRids.end());
+		recentlyUpdatedRids->insert(recentlyUpdatedRids->end(), updateRids.begin(), updateRids.end());
 	}
 
 	void setTransaction(Transaction* transaction) {
@@ -50,10 +54,10 @@ public:
 	// run garbage collection
 	void run() {
 		// if no recently updated rid => stop
-		if (recentlyUpdatedRids.size() == 0) {
+		if (recentlyUpdatedRids->size() == 0) {
 			return;
 		}
-		cout << "Garbage Collector running ! with size = " << recentlyUpdatedRids.size() << endl;
+		cout << "Garbage Collector running ! with size = " << recentlyUpdatedRids->size() << endl;
 		// get active transactions
 		vector<size_t> vecActiveTx = transaction->listActiveTransaction();
 		// loop through all columns of table to garbage collecting
@@ -62,8 +66,8 @@ public:
 				Column<int>* col = (Column<int>*) colBase;
 				// from rid -> update Version space to Data space
 				// -> delete old versions
-				for (size_t i = 0; i < recentlyUpdatedRids.size(); i++) {
-					size_t rid = recentlyUpdatedRids.at(i);
+				for (size_t i = 0; i < recentlyUpdatedRids->size(); i++) {
+					size_t rid = recentlyUpdatedRids->at(i);
 					// update Version space to Data space
 					col->updateVersionSpace2DataSpace(rid);
 					// check active Transaction to delete old versions
@@ -86,8 +90,8 @@ public:
 				Column<string>* col = (Column<string>*) colBase;
 				// from rid -> update Version space to Data space
 				// -> delete old versions
-				for (size_t i = 0; i < recentlyUpdatedRids.size(); i++) {
-					size_t rid = recentlyUpdatedRids.at(i);
+				for (size_t i = 0; i < recentlyUpdatedRids->size(); i++) {
+					size_t rid = recentlyUpdatedRids->at(i);
 					// update Version space to Data space
 					col->updateVersionSpace2DataSpace(rid);
 					// check active Transaction to delete old versions
@@ -108,7 +112,7 @@ public:
 			}
 		}
 		// clear recently updated rid
-		recentlyUpdatedRids.clear();
+		recentlyUpdatedRids->clear();
 	}
 
 	void start(int interval)

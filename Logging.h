@@ -20,6 +20,7 @@ public:
 	enum LOG_TX_ACTION {TX_START=1, TX_COMMIT=2, TX_END=3};
 	struct logging {
 		size_t txIdx;
+		string colName;
 		vector<string> logContent;
 		LOG_OBJECT objType;
 		LOG_TX_ACTION txAction;
@@ -36,9 +37,12 @@ public:
 
 	void saveCheckpoint(Table* table);
 	void redoLogUpdate(size_t txIdx, LOG_TX_ACTION txAction);
-	void redoLogAdd(size_t txIdx, LOG_OBJECT objType, vector<string> logContent);
+	void redoLogAdd(size_t txIdx, string colName, LOG_OBJECT objType, vector<string> logContent);
 	void redoLogPublicMerge();
 	void redoLogSave();
+
+	//restore
+	void restore(Table* table);
 };
 
 } /* namespace std */
