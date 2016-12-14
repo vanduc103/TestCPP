@@ -35,6 +35,10 @@ public:
 		m_columns = columns;
 	}
 
+	Table() {
+		m_columns = new vector<ColumnBase*>();
+	}
+
 	vector<ColumnBase*>* columns() {
 		return m_columns;
 	}
@@ -145,6 +149,24 @@ public:
 			this->m_columns->push_back(colBase);
 		}
 		delete content;
+	}
+
+	// redo log restore
+	void redoLogRestore(string colName,
+						vector<string>* deltaSpaceLog, vector<string>* versionVecValueLog,
+						vector<string>* insertLog,
+						vector<string>* versionColumnLog, vector<string>* hashtableLog) {
+		ColumnBase* colBase = getColumnByName(colName);
+		if (colBase->getType() == ColumnBase::intType) {
+			Column<int>* col = (Column<int>*) colBase;
+			col->redoLogRestore(deltaSpaceLog, versionVecValueLog,
+					insertLog, versionColumnLog, hashtableLog);
+		}
+		else {
+			Column<string>* col = (Column<string>*) colBase;
+			col->redoLogRestore(deltaSpaceLog, versionVecValueLog,
+					insertLog, versionColumnLog, hashtableLog);
+		}
 	}
 
 };

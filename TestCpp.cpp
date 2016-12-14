@@ -227,6 +227,7 @@ string updateCommand(ServerSocket* client, Table* table, Transaction* transactio
 		transaction->setCommand(txIdx, command);
 	}
 	transaction->startTx(txIdx);
+	logging->redoLogUpdate(txIdx, Logging::TX_START);
 	uint64_t csn = transaction->getStartTimestamp(txIdx);
 	// get update value from command and execute update
 	if (command.size() >= 3) {
@@ -238,7 +239,6 @@ string updateCommand(ServerSocket* client, Table* table, Transaction* transactio
 			}
 			// check column's CSN with tx start time stamp
 			if (col->getCSN(rid) <= csn) {
-				logging->redoLogUpdate(txIdx, Logging::TX_START);
 				col->addVersionVecValue(o_orderkey, csn, rid, txIdx, logging);
 			}
 			else
@@ -253,7 +253,6 @@ string updateCommand(ServerSocket* client, Table* table, Transaction* transactio
 		}
 		// check column's CSN with tx start time stamp
 		if (col->getCSN(rid) <= csn) {
-			logging->redoLogUpdate(txIdx, Logging::TX_START);
 			col->addVersionVecValue(o_orderstatus, csn, rid, txIdx, logging);
 		}
 		else
@@ -267,7 +266,6 @@ string updateCommand(ServerSocket* client, Table* table, Transaction* transactio
 		}
 		// check column's CSN with tx start time stamp
 		if (col->getCSN(rid) <= csn) {
-			logging->redoLogUpdate(txIdx, Logging::TX_START);
 			col->addVersionVecValue(o_totalprice, csn, rid, txIdx, logging);
 		}
 		else
@@ -281,7 +279,6 @@ string updateCommand(ServerSocket* client, Table* table, Transaction* transactio
 		}
 		// check column's CSN with tx start time stamp
 		if (col->getCSN(rid) <= csn) {
-			logging->redoLogUpdate(txIdx, Logging::TX_START);
 			col->addVersionVecValue(o_comment, csn, rid, txIdx, logging);
 		}
 		else

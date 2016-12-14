@@ -332,6 +332,8 @@ public:
 		// set maximum csn so that another transaction cannot update
 		if (rid != -1)
 			this->setCSN(rid, true);
+		// logging column start
+		logging->redoLogUpdate(txIdx, Logging::COLUMN_START, this->getName());
 		// add to delta space and version vector (start from last dictionary position)
 		bool sorted = dictionary->getSorted();
 		deltaSpace->addNewElement(value, versionVecValue, sorted, false);
@@ -351,7 +353,7 @@ public:
 			rid = dataColumn->size() - 1;
 			// redo log for Insert case
 			insertLog->push_back(to_string(-1));
-			logging->redoLogAdd(txIdx, this->getName(), Logging::INSERT, *insertLog);
+			logging->redoLogAdd(txIdx, Logging::INSERT, *insertLog);
 		}
 		// check previous version on hash table
 		int preVersionIdx = -1;
@@ -382,7 +384,7 @@ public:
 		// log delta space
 		vector<string>* deltaSpaceLog = new vector<string>();
 		deltaSpace->redoLogCreate(deltaSpaceLog);
-		logging->redoLogAdd(txIdx, this->getName(), Logging::DELTA_SPACE, *deltaSpaceLog);
+		logging->redoLogAdd(txIdx, Logging::DELTA_SPACE, *deltaSpaceLog);
 		delete deltaSpaceLog;
 		// log version vecValue
 		vector<string>* versionVecValueLog = new vector<string>();
@@ -390,16 +392,18 @@ public:
 			size_t value = versionVecValue->at(i);
 			versionVecValueLog->push_back(to_string(value));
 		}
-		logging->redoLogAdd(txIdx, this->getName(), Logging::VERSION_VECVALUE, *versionVecValueLog);
+		logging->redoLogAdd(txIdx, Logging::VERSION_VECVALUE, *versionVecValueLog);
 		// log versionColumn
 		vector<string>* versionColumnLog = new vector<string>();
 		versionColumnLog->push_back(to_string(encodedValueIdx));
 		versionColumnLog->push_back(to_string(csn));
-		logging->redoLogAdd(txIdx, this->getName(), Logging::VERSION_COLUMN, *versionColumnLog);
+		logging->redoLogAdd(txIdx, Logging::VERSION_COLUMN, *versionColumnLog);
 		// log hashtable
 		vector<string>* hashtableLog = new vector<string>();
 		hashtableLog->push_back(to_string(rid));
-		logging->redoLogAdd(txIdx, this->getName(), Logging::HASHTABLE, *hashtableLog);
+		logging->redoLogAdd(txIdx, Logging::HASHTABLE, *hashtableLog);
+		// logging column end
+		logging->redoLogUpdate(txIdx, Logging::COLUMN_END, this->getName());
 	}
 
 	void redoLogRestore(vector<string>* deltaSpaceLog, vector<string>* versionVecValueLog,
@@ -413,12 +417,14 @@ public:
 			string value = versionVecValueLog->at(i);
 			versionVecValue->push_back(stol(value));
 		}
+		delete versionVecValueLog;
 		// redo for INSERT case
 		if (insertLog != NULL && insertLog->size() >= 1) {
 			// add new in data column
 			data_column newData;
 			dataColumn->push_back(newData);
 		}
+		delete insertLog;
 		// get rid from hashtable log
 		size_t rid = -1;
 		if (hashtableLog->size() >= 1) {
@@ -428,6 +434,7 @@ public:
 			cout << "hashtable redo log error !";
 			return;
 		}
+		delete hashtableLog;
 		// redo for versionColumn
 		size_t encodedValueIdx = -1;
 		uint64_t csn = 0;
@@ -439,6 +446,7 @@ public:
 			cout << "versionColumn redo log error !";
 			return;
 		}
+		delete versionColumnLog;
 		// create new version
 		version_column newVersion;
 		newVersion.encodedValueIdx = encodedValueIdx;

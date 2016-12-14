@@ -126,6 +126,15 @@ int main(int argc, char* argv[]) {
 					if (commandType == "CREATE") {
 						cout << ">> Create table" << endl;
 						table = createTable(createQuery);
+						if (table != NULL)
+							result = "Create table '" + table->getName() + "' successfully !";
+					}
+					else if (commandType == "RESTORE") {
+						cout << ">> Restore database" << endl;
+						// init table
+						table = new Table();
+						logging->restore(table);
+						result = "Restore database successfully !";
 					}
 					else if (commandType == "UPDATE") {
 						cout << ">> Update command" << endl;

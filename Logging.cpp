@@ -40,17 +40,24 @@ void Logging::saveCheckpoint(Table* table) {
 	}
 }
 
-void Logging::redoLogUpdate(size_t txIdx, LOG_TX_ACTION txAction){
+void Logging::redoLogUpdate(size_t txIdx, LOG_ACTION txAction){
 	logging newLog;
 	newLog.txIdx = txIdx;
 	newLog.txAction = txAction;
 	privateLogBuffer->push_back(newLog);
 }
 
-void Logging::redoLogAdd(size_t txIdx, string colName, LOG_OBJECT objType, vector<string> logContent) {
+void Logging::redoLogUpdate(size_t txIdx, LOG_ACTION txAction, string colName){
 	logging newLog;
 	newLog.txIdx = txIdx;
+	newLog.txAction = txAction;
 	newLog.colName = colName;
+	privateLogBuffer->push_back(newLog);
+}
+
+void Logging::redoLogAdd(size_t txIdx, LOG_OBJECT objType, vector<string> logContent) {
+	logging newLog;
+	newLog.txIdx = txIdx;
 	newLog.objType = objType;
 	newLog.logContent = logContent;
 	privateLogBuffer->push_back(newLog);
@@ -66,39 +73,47 @@ void Logging::redoLogSave() {
 	vector<string>* content = new vector<string>();
 	for (size_t i = 0; i < publicLogBuffer->size(); i++) {
 		logging log = publicLogBuffer->at(i);
+		string contentValue = to_string(log.txIdx);
 		switch (log.txAction) {
 			case TX_START: {
-				content->push_back(to_string(log.txIdx) + "|start");
+				contentValue += "|start";
 				break;
 			}
 			case TX_COMMIT: {
-				content->push_back(to_string(log.txIdx) + "|commit");
+				contentValue += "|commit";
 				break;
 			}
 			case TX_END: {
-				content->push_back(to_string(log.txIdx) + "|end");
+				contentValue += "|end";
+				break;
+			}
+			case COLUMN_START: {
+				contentValue += "|column_start";
+				break;
+			}
+			case COLUMN_END: {
+				contentValue += "|column_end";
 				break;
 			}
 		}
-		string objValue = to_string(log.txIdx) + "|";
 		if (log.colName != "") {
-			objValue += log.colName + "|";
+			contentValue += "|" + log.colName;
 		}
 		switch (log.objType) {
 			case INSERT:
-				objValue += "insert|";
+				contentValue += "|insert|";
 				break;
 			case DELTA_SPACE:
-				objValue += "delta_space|";
+				contentValue += "|delta_space|";
 				break;
 			case VERSION_VECVALUE:
-				objValue += "version_vec_value|";
+				contentValue += "|version_vec_value|";
 				break;
 			case HASHTABLE:
-				objValue += "hashtable|";
+				contentValue += "|hashtable|";
 				break;
 			case VERSION_COLUMN:
-				objValue += "version_column|";
+				contentValue += "|version_column|";
 				break;
 		}
 		if (log.logContent.size() > 0) {
@@ -107,8 +122,8 @@ void Logging::redoLogSave() {
 				string value = log.logContent.at(i);
 				tmpValue += value + "|";
 			}
-			objValue += tmpValue;
-			content->push_back(objValue);
+			contentValue += tmpValue;
+			content->push_back(contentValue);
 		}
 	}
 	if (publicLogBuffer->size() > 0) {
@@ -124,6 +139,7 @@ void Logging::restore(Table* table) {
 	// get latest checkpoint
 	string latestCkpt = Util::getLatestFile(logPath, "checkpoint");
 	if (latestCkpt != "") {
+		cout << "Start redo log restore !" << endl;
 		// restore from checkpoint
 		vector<string>* content = new vector<string>();
 		Util::readFromDisk(content, latestCkpt);
@@ -150,8 +166,14 @@ void Logging::restore(Table* table) {
 			for (size_t i = 0; i < redoContent->size(); i++) {
 				string log = redoContent->at(i);
 				string colName = "";
-				if (log.find("start") != string::npos) {
-
+				if (log.find("column_start") != string::npos) {
+					colName = log.substr(log.find("column_start")+1);
+					// re-init log vector
+					deltaSpaceLog = new vector<string>();
+					versionVecValueLog = new vector<string>();
+					insertLog = new vector<string>();
+					versionColumnLog = new vector<string>();
+					hashtableLog = new vector<string>();
 				}
 				if (log.find("delta_space") != string::npos) {
 					string logContent = log.substr(log.find("delta_space")+1);
@@ -173,12 +195,15 @@ void Logging::restore(Table* table) {
 					string logContent = log.substr(log.find("hashtable")+1);
 					Util::parseContentToVector(hashtableLog, logContent, "|");
 				}
-				if (log.find("end") != string::npos) {
+				if (log.find("column_end") != string::npos && table != NULL && colName != "") {
 					// restore
-
+					table->redoLogRestore(colName, deltaSpaceLog, versionVecValueLog,
+							insertLog, versionColumnLog, hashtableLog);
 				}
 			}
+			delete redoContent;
 		}
+		cout << "End redo log restore !" << endl;
 	}
 }
 

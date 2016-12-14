@@ -77,7 +77,7 @@ public:
 				  dir_itr != end_iter;
 				  ++dir_itr ) {
 				if ( fs::is_regular_file( dir_itr->status() ) ) {
-					string filename = dir_itr->path().filename();
+					string filename = dir_itr->path().filename().string();
 					cout << filename << endl;
 					size_t i = filename.find(pattern);
 					if (i != string::npos) {
@@ -102,7 +102,7 @@ public:
 				  dir_itr != end_iter;
 				  ++dir_itr ) {
 				if ( fs::is_regular_file( dir_itr->status() ) ) {
-					string filename = dir_itr->path().filename();
+					string filename = dir_itr->path().filename().string();
 					cout << filename << endl;
 					size_t i = filename.find(pattern);
 					if (i != string::npos) {
@@ -117,7 +117,7 @@ public:
 		return newestFiles;
 	}
 
-	void parseContentToVector(string<vector>* data, string content, string delim) {
+	static void parseContentToVector(vector<string>* data, string content, string delim) {
 		string token;
 		size_t last = 0; size_t next = 0;
 		while ((next = content.find(delim, last)) != string::npos) {
