@@ -26,8 +26,8 @@ vector<Logging::logging>* Logging::publicLogBuffer = new vector<Logging::logging
 
 
 void Logging::saveCheckpoint(Table* table) {
-	// create folder log
-	Util::createFolder(this->logPath);
+	/*// create folder log
+	Util::createFolder(this->logPath);*/
 
 	// write content
 	string fileName = this->logPath + "/checkpoint_" + to_string(Util::currentMilisecond());
@@ -136,6 +136,7 @@ void Logging::redoLogSave() {
 }
 
 void Logging::restore(Table* table) {
+	cout << "here -1" << endl;
 	// get latest checkpoint
 	string latestCkpt = Util::getLatestFile(logPath, "checkpoint");
 	if (latestCkpt != "") {

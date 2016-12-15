@@ -13,13 +13,12 @@
 #include <fstream>
 #include <iostream>
 #include <string>
-#include <boost/filesystem.hpp>
+#include "boost/filesystem.hpp"
 
 #ifndef UTIL_H_
 #define UTIL_H_
 
-using namespace std;
-namespace fs = boost::filesystem;
+namespace std {
 
 class Util {
 public:
@@ -60,76 +59,25 @@ public:
 		}
 	}
 
+	static void appendToFile(string content, string fileName) {
+		if (content != "" && fileName != "") {
+			std::ofstream ofs;
+			ofs.open(fileName, ofstream::app);
+		}
+	}
+
 	static void createFolder(string folderPath) {
-		fs::path dir(folderPath);
-		fs::remove_all(dir);
-		fs::create_directory(dir);
+		boost::filesystem::path dir(folderPath);
+		boost::filesystem::remove_all(dir);
+		boost::filesystem::create_directory(dir);
 	}
 
-	// get latest file from file pattern
-	static string getLatestFile(string folderPath, string pattern) {
-		string latestFileName = "";
-		long maxTime = 0;
-		fs::path dir(folderPath);
-		if (fs::exists(dir) && fs::is_directory(dir)) {
-			fs::directory_iterator end_iter;
-			for ( fs::directory_iterator dir_itr( dir );
-				  dir_itr != end_iter;
-				  ++dir_itr ) {
-				if ( fs::is_regular_file( dir_itr->status() ) ) {
-					string filename = dir_itr->path().filename().string();
-					cout << filename << endl;
-					size_t i = filename.find(pattern);
-					if (i != string::npos) {
-						//found
-						long time = stol(filename.substr(i+1));
-						if (time > maxTime)
-							latestFileName = filename;
-					}
-				}
-			}
-		}
-		return latestFileName;
-	}
-
-	// get all file from a specific time
-	static vector<string> getNewestFiles(string folderPath, string pattern, long aTime) {
-		vector<string> newestFiles;
-		fs::path dir(folderPath);
-		if (fs::exists(dir) && fs::is_directory(dir)) {
-			fs::directory_iterator end_iter;
-			for ( fs::directory_iterator dir_itr( dir );
-				  dir_itr != end_iter;
-				  ++dir_itr ) {
-				if ( fs::is_regular_file( dir_itr->status() ) ) {
-					string filename = dir_itr->path().filename().string();
-					cout << filename << endl;
-					size_t i = filename.find(pattern);
-					if (i != string::npos) {
-						//found
-						long time = stol(filename.substr(i+1));
-						if (time >= aTime)
-							newestFiles.push_back(filename);
-					}
-				}
-			}
-		}
-		return newestFiles;
-	}
-
-	static void parseContentToVector(vector<string>* data, string content, string delim) {
-		string token;
-		size_t last = 0; size_t next = 0;
-		while ((next = content.find(delim, last)) != string::npos) {
-			token = content.substr(last, next - last);
-			last = next + delim.length();
-			if(token != "") data->push_back(token);
-		}
-		// get the last token
-		token = content.substr(last);
-		if(token != "") data->push_back(token);
-	}
+	static string getLatestFile(string folderPath, string pattern);
+	static vector<string> getNewestFiles(string folderPath, string pattern, long aTime);
+	static void parseContentToVector(vector<string>* data, string content, string delim);
 
 };
+
+} /* namespace std */
 
 #endif /* UTIL_H_ */
